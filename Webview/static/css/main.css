@@ -1,0 +1,50 @@
+body, html {
+    background-color: #222;
+    color: lightgreen;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: monospace;
+}
+
+.centered {
+    position: relative;
+    margin: auto;
+    width: 50vw;
+    margin-top: 10vh;
+    text-align: center;
+}
+
+.logo {
+    width: 100px;
+    height: 100px;
+    margin: auto;
+    background: url("/img/logo.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    padding: 5rem;
+}
+
+.heading {
+    text-transform: uppercase;
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.minimal {
+    text-align: left;
+    color: white;
+    font-size: 1rem;
+    letter-spacing: 1px;
+    text-transform: none;
+    list-style-type: square;
+}
+
+.minimal li {
+    padding-top: 1rem;
+}
+
+.minimal a {
+    font-weight: 300;
+    color: white !important;
+}
