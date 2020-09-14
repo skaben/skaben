@@ -9,11 +9,14 @@ from werkzeug.wrappers import BaseResponse as Response
 from contextlib import redirect_stdout
 from io import StringIO
 
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+
 
 template_dir = os.path.join(os.path.dirname(__file__), 'static')
 static_dir = os.path.join(os.path.dirname(__file__), 'static')
-
-webview.gui = 'gtk'
 
 app = Flask(__name__,
             static_url_path='',
@@ -95,7 +98,11 @@ def main():
             window = webview.create_window('TERMINAL',
                                            app,
                                            fullscreen=True)
-            webview.start(debug=True)
+            webview.gui = "gtk"
+            webview.start(gui="gtk", debug=True)
+    except RuntimeError:
+        gtk_check_result = Gtk.init_check()
+        print(f"GTK: {gtk_check_result[0]} - seems like Xserver not exists")
     except Exception:
         raise
 
