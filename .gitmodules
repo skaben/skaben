@@ -1,0 +1,8 @@
+[submodule "back"]
+        path = server_core
+        url = ../server_core.git
+        update = merge
+[submodule "front"]
+        path = server_front
+        url = ../server_front.git
+        update = merge
