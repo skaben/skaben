@@ -1,0 +1,127 @@
+version: "3"
+
+services:
+
+  nginx:
+    build: './docker_build/nginx'
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./server_core/docker_build/wait-for-it.sh:/wait-for-it.sh
+      - ./server_core/docker_build/nginx/conf.d/local.dev.conf:/etc/nginx/conf.d/local.conf
+      - ./logs/nginx:/var/log/nginx
+      - static_volume:/skaben/static
+    depends_on:
+      - back
+      - front
+    networks:
+      - skaben_network
+
+  back:
+    build: server_core/.
+    image: skaben/latest
+    healthcheck:
+      test: curl -f http://skaben:8000 || exit 1
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    env_file: '.env'
+    volumes:
+      - ./server_core/skaben:/skaben
+      - static_volume:/skaben/static
+      - files_volume:/media
+    entrypoint: /entrypoint-dev.sh
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - rabbitmq
+    networks:
+      - skaben_network
+
+  front:
+    build: server_front/.
+    volumes:
+      - ./server_front/app:/app
+      - ./server_front/dist:/app/dist
+      - node_modules:/app/node_modules
+      - static_volume:/static
+
+  rabbitmq:
+    build: './server_code/docker_build/rabbitmq'
+    hostname: "rabbitmq"
+    env_file: ".env"
+    ports:
+      - "15672:15672"
+      - "15674:15674"
+      - "15675:15675"
+      - "15692:15692"
+      - "5672:5672"
+      - "1883:1883"
+      - "8883:8883"
+    networks:
+      - skaben_network
+
+  db:
+    image: postgres:latest
+    restart: unless-stopped
+    volumes:
+      - db_volume:/var/lib/postgresql/data
+      - ./tmp:/home/root/tmp
+    networks:
+      - skaben_network
+    env_file: ".env"
+
+#  prometheus:
+#    build: './docker_build/prom'
+#    ports:
+#      - 9090:9090
+#    command:
+#      - --config.file=/etc/prometheus/prometheus.yml
+#    depends_on:
+#      - rabbitmq
+#    networks:
+#      - skaben_network
+#    user: "65534:65534"
+#
+#  cadvisor:
+#    image: gcr.io/google-containers/cadvisor:latest
+#    container_name: cadvisor
+#    ports:
+#      - 8080:8080
+#    volumes:
+#      - /:/rootfs:ro
+#      - /var/run:/var/run:rw
+#      - /sys:/sys:ro
+#      - /var/lib/docker/:/var/lib/docker:ro
+#    networks:
+#      - skaben_network
+#
+#  grafana:
+#    image: grafana/grafana:latest
+#    restart: unless-stopped
+#    ports:
+#      - 3000:3000
+#    links:
+#      - prometheus:prometheus
+#    volumes:
+#      - grafana_volume:/var/lib/grafana
+#    networks:
+#      - skaben_network
+
+
+volumes:
+  db_volume: {}
+  static_volume: {}
+  files_volume: {}
+  grafana_volume: {}
+
+
+networks:
+  skaben_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.8.0.0/16
