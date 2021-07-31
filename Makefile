@@ -9,10 +9,12 @@ RESET := $(shell tput init)
 include ${env}
 export $(shell sed 's/=.*//' ${env})
 
-build: ##  Собрать все сервисы без кэша
+fetch: ##  Скачать все репозитории
 	@git submodule init
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
+
+build: ##  Собрать без кэша
 	@docker-compose build --no-cache
 
 start: ##  Запуск всех сервисов

@@ -2,7 +2,9 @@
         path = server_core
         url = ../server_core.git
         update = merge
+        branch = main
 [submodule "front"]
         path = server_front
         url = ../server_front.git
         update = merge
+        branch = main
