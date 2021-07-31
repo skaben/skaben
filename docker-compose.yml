@@ -9,8 +9,8 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - ./server_core/docker_build/wait-for-it.sh:/wait-for-it.sh
-      - ./server_core/docker_build/nginx/conf.d/local.dev.conf:/etc/nginx/conf.d/local.conf
+      - ./docker_build/wait-for-it.sh:/wait-for-it.sh
+      - ./docker_build/nginx/conf.d/:/etc/nginx/conf.d/
       - ./logs/nginx:/var/log/nginx
       - static_volume:/skaben/static
     depends_on:
@@ -20,19 +20,14 @@ services:
       - skaben_network
 
   back:
-    build: server_core/.
-    image: skaben/latest
-    healthcheck:
-      test: curl -f http://skaben:8000 || exit 1
-      interval: 1m
-      timeout: 10s
-      retries: 3
-    env_file: '.env'
+    build: 
+      context: server_core/.
+    image: skaben/core
+    env_file: 'server_core/.env'
     volumes:
       - ./server_core/skaben:/skaben
       - static_volume:/skaben/static
       - files_volume:/media
-    entrypoint: /entrypoint-dev.sh
     ports:
       - "8000:8000"
     depends_on:
@@ -42,7 +37,9 @@ services:
       - skaben_network
 
   front:
-    build: server_front/.
+    build:
+      context: server_front/.
+    image: skaben/front
     volumes:
       - ./server_front/app:/app
       - ./server_front/dist:/app/dist
@@ -50,7 +47,7 @@ services:
       - static_volume:/static
 
   rabbitmq:
-    build: './server_code/docker_build/rabbitmq'
+    build: './docker_build/rabbitmq'
     hostname: "rabbitmq"
     env_file: ".env"
     ports:
@@ -117,11 +114,11 @@ volumes:
   static_volume: {}
   files_volume: {}
   grafana_volume: {}
+  node_modules: {}
 
 
 networks:
   skaben_network:
-    driver: bridge
     ipam:
       config:
         - subnet: 10.8.0.0/16

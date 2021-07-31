@@ -1,6 +1,5 @@
+.env
 venv/
 .idea/
-./tmp/
-!./tmp/.gitkeep
-./logs/nginx/
-!./logs/nginx/.gitkeep
+tmp/
+logs/

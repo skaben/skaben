@@ -14,10 +14,12 @@ fetch: ##  Скачать все репозитории
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
 
-build: ##  Собрать без кэша
+build-clean: ##  Собрать без кэша
+	@docker-compose down front -v
 	@docker-compose build --no-cache
 
 start: ##  Запуск всех сервисов
+	@mkdir -p logs/nginx tmp
 	@docker-compose up --force-recreate -d
 	@docker-compose ps
 
@@ -38,6 +40,7 @@ stop:  ##  Остановка всех сервисов
 
 restart.%: ##  Перезапустить сервис [restart.[service]]
 	@docker-compose restart $*
+	@docker-compose restart nginx
 
 info:  ## Показать список сервисов
 	@docker-compose ps -a
