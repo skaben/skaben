@@ -9,15 +9,15 @@ RESET := $(shell tput init)
 include ${env}
 export $(shell sed 's/=.*//' ${env})
 
-fetch: ##  Скачать все репозитории
+fetch: ##  Скачать все репозитории -- требует интернета
 	@git submodule init
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
 
-build: ##  Собрать без кэша
+build: ##  Собрать без кэша -- требует интернета
 	@docker-compose build --no-cache
 
-rebuild: ##  Собрать без кэша, с удалением node_modules
+rebuild: ##  Собрать без кэша, с удалением node_modules -- требует интернета
 	@docker-compose down front -v
 	@docker-compose build --no-cache
 
