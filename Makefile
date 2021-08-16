@@ -14,7 +14,10 @@ fetch: ##  Скачать все репозитории
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
 
-build-clean: ##  Собрать без кэша
+build: ##  Собрать без кэша
+	@docker-compose build --no-cache
+
+rebuild: ##  Собрать без кэша, с удалением node_modules
 	@docker-compose down front -v
 	@docker-compose build --no-cache
 
@@ -30,19 +33,18 @@ exec: ##  Выполнение команды в указанном сервис
 	@docker-compose exec $$CMD
 
 migrate: ##  Применить миграции
-	@docker-compose exec skaben python manage.py migrate
+	@docker-compose exec back python manage.py migrate
 
 migrations: ##  Создать новую миграцию
-	@docker-compose exec skaben python manage.py makemigrations
+	@docker-compose exec back python manage.py makemigrations
 
 stop:  ##  Остановка всех сервисов
 	@docker-compose down
 
 restart.%: ##  Перезапустить сервис [restart.[service]]
-	@docker-compose restart $*
-	@docker-compose restart nginx
+	@docker-compose up --force-recreate -d $*
 
-info:  ## Показать список сервисов
+info:  ##  Показать список сервисов
 	@docker-compose ps -a
 
 help:
