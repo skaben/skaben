@@ -3,3 +3,5 @@ venv/
 .idea/
 tmp/
 logs/
+docker_build/pg_admin/pg_backups/*
+!docker_build/pg_admin/pg_backups/.gitkeep
