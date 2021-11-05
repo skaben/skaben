@@ -13,6 +13,7 @@ fetch: ##  Скачать все репозитории -- требует инт
 	@git submodule init
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
+	@git submodule foreach "git pull"
 
 build: ##  Собрать без кэша -- требует интернета
 	@docker-compose build --no-cache
