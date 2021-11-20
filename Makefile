@@ -1,18 +1,19 @@
 .DEFAULT_GOAL := help
 
-env := .env
+#env := .env
 
 ACCENT  := $(shell tput -Txterm setaf 2)
 RESET := $(shell tput init)
 
-.EXPORT_ALL_VARIABLES:
-include ${env}
-export $(shell sed 's/=.*//' ${env})
+#.EXPORT_ALL_VARIABLES:
+#include ${env}
+#export $(shell sed 's/=.*//' ${env})
 
 fetch: ##  Скачать все репозитории -- требует интернета
 	@git submodule init
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
+	@git submodule foreach "git pull"
 
 build: ##  Собрать без кэша -- требует интернета
 	@docker-compose build --no-cache
