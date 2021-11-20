@@ -34,21 +34,21 @@ services:
     networks:
       - skaben_network
 
-  workers:
-    build: 
-      context: server_core/.
-    image: skaben/back
-    env_file: 'server_core/.env'
-    volumes:
-      - ./server_core/skaben:/skaben
-      - static_volume:/static
-      - files_volume:/media
-    depends_on:
-      - back
-    command: >
-      sh -c "python manage.py start_workers"
-    networks:
-      - skaben_network
+#  workers:
+#    build: 
+#      context: server_core/.
+#    image: skaben/back
+#    env_file: 'server_core/.env'
+#    volumes:
+#      - ./server_core/skaben:/skaben
+#      - static_volume:/static
+#      - files_volume:/media
+#    depends_on:
+#      - back
+#    command: >
+#      sh -c "python manage.py start_workers"
+#    networks:
+#      - skaben_network
 
   front:
     build:
