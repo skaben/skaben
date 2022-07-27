@@ -15,7 +15,7 @@ services:
       - static_volume:/static
     depends_on:
       - back
-      - front
+        #  - front
     networks:
       - skaben_network
 
