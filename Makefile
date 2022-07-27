@@ -39,11 +39,14 @@ migrate: ##  Применить миграции
 migrations: ##  Создать новую миграцию
 	@docker-compose exec back python manage.py makemigrations
 
+superuser: ##  Создать юзера
+	@docker-compose exec back python manage.py createsuperuser
+
 stop:  ##  Остановка всех сервисов
-	@docker-compose down
+	@docker-compose down --remove-orphans
 
 restart.%: ##  Перезапустить сервис [restart.[service]]
-	@docker-compose up --force-recreate -d $*
+	@docker-compose up --force-recreate --remove-orphans -d $*
 
 info:  ##  Показать список сервисов
 	@docker-compose ps -a

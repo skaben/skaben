@@ -15,7 +15,7 @@ services:
       - static_volume:/static
     depends_on:
       - back
-        #  - front
+      - front
     networks:
       - skaben_network
 
@@ -33,21 +33,22 @@ services:
       - rabbitmq
     networks:
       - skaben_network
-#
-#  front:
-#    build:
-#      context: server_front/.
-#    image: skaben/front
-#    environment:
-#      - CHOKIDAR_USEPOLLING=True
-#    env_file: 'server_front/.env'
-#    volumes:
-#      - ./server_front/app:/app
-#      - ./server_front/dist:/app/dist
-#      - node_modules:/app/node_modules
-#      - static_volume:/static
-#    networks:
-#      - skaben_network
+
+  front:
+    build:
+      context: server_front/.
+    image: skaben/front
+    environment:
+      - CHOKIDAR_USEPOLLING=True
+      - VUE_HOST=0.0.0.0
+      - VUE_PORT=3000
+    volumes:
+      - ./server_front/app:/app
+      - ./server_front/dist:/app/dist
+      - node_modules:/app/node_modules
+      - static_volume:/static
+    networks:
+      - skaben_network
 
   rabbitmq:
     build: './docker_build/rabbitmq'
