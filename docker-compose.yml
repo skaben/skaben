@@ -1,54 +1,79 @@
-version: "3"
+version: "3.6"
 
 services:
 
-  nginx:
-    build: './docker_build/nginx'
+  api:
+    image: 'skaben-api:latest'
     restart: unless-stopped
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      - ./docker_build/wait-for-it.sh:/wait-for-it.sh
-      - ./docker_build/nginx/conf.d/:/etc/nginx/conf.d/
-      - ./logs/nginx:/var/log/nginx
-      - static_volume:/static
-    depends_on:
-      - back
-      - front
-    networks:
-      - skaben_network
-
-  back:
-    build: 
+    build:
       context: server_core/.
-    image: skaben/back
+      target: api_build
     env_file: 'server_core/.env'
     volumes:
-      - ./server_core/skaben:/opt/app/skaben
+      - ./server_core:/opt/app
       - static_volume:/static
+      - ./server_core/static:/static/static
       - files_volume:/media
     depends_on:
       - db
       - rabbitmq
+      - redis
     networks:
-      - skaben_network
+      - network_public
+      - network_backbone
+    command: |
+      sh -c "/opt/app/entrypoint.sh"
+
+  worker:
+    <<: &worker
+      image: 'skaben-api:latest'
+      build:
+        context: server_core/.
+        target: base_build
+        cache_from:
+          - 'skaben-api'
+          - '*'
+      env_file: 'server_core/.env'
+      volumes:
+        - ./server_core:/opt/app
+      depends_on:
+        - api
+      networks:
+        - network_backbone
+      restart: unless-stopped
+      command: python manage.py start_worker internal
+
+  worker_save:
+    <<: *worker
+    command: python manage.py start_worker state
+
+  worker_send:
+    <<: *worker
+    command: python manage.py start_worker client
+
+  worker_mqtt:
+    <<: *worker
+    command: python manage.py start_worker mqtt
 
   front:
+    image: 'skaben-front:latest'
     build:
       context: server_front/.
-    image: skaben/front
     environment:
       - CHOKIDAR_USEPOLLING=True
       - VUE_HOST=0.0.0.0
       - VUE_PORT=3000
+    command: |
+      sh -c "yarn run dev"
     volumes:
       - ./server_front/app:/app
-      - ./server_front/dist:/app/dist
+      - ./server_front/app/dist:/app/dist
       - node_modules:/app/node_modules
       - static_volume:/static
     networks:
-      - skaben_network
+      - network_public
+
+  ### INFRASTRUCTURE ###
 
   rabbitmq:
     build: './docker_build/rabbitmq'
@@ -62,7 +87,16 @@ services:
       - "1883:1883"
       - "8883:8883"
     networks:
-      - skaben_network
+      - network_public  # admin interface
+      - network_backbone
+
+  redis:
+    image: "redis:alpine"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - network_backbone
 
   db:
     image: postgres:13.4
@@ -71,21 +105,50 @@ services:
       - db_volume:/var/lib/postgresql/data
       - ./tmp:/home/root/tmp
     networks:
-      - skaben_network
+      - network_backbone
     ports:
       - "5432:5432"
     env_file: "server_core/.env"
 
+  portainer:
+    image: portainer/portainer-ce:latest
+    networks:
+      - network_public
+    ports:
+      - "9000:9000"
+    volumes:
+      - portainer_volume:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  nginx:
+    build: './docker_build/nginx'
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./docker_build/wait-for-it.sh:/wait-for-it.sh
+      - ./docker_build/nginx/conf.d/:/etc/nginx/conf.d/
+      - ./logs/nginx:/var/log/nginx
+      - static_volume:/static
+    depends_on:
+      - api
+      - front
+    networks:
+      - network_public
 
 volumes:
   db_volume: {}
+  redis_data: {}
   static_volume: {}
   files_volume: {}
   node_modules: {}
-
+  portainer_volume: {}
 
 networks:
-  skaben_network:
-    ipam:
-      config:
-        - subnet: 10.8.0.0/16
+  network_backbone:
+  network_public:
+#    ipam:
+#      config:
+#        - subnet: 10.8.0.0/16

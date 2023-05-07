@@ -1,1 +1,85 @@
-{"rabbit_version":"3.8.3","rabbitmq_version":"3.8.3","users":[{"name":"rabbitmq","password_hash":"9ZhIxZU+9b63eRLFwdyE0UcRo82AxafAY0TvduXZ5I6HoOAy","hashing_algorithm":"rabbit_password_hashing_sha256","tags":"administrator"},{"name":"skaben","password_hash":"SZc4sPfm+yfnMPhen2mnGuY6BQjYvtnXGa2SyQ2UUzGMcTgg","hashing_algorithm":"rabbit_password_hashing_sha256","tags":""},{"name":"mqtt","password_hash":"1Hc6ke+ZjkA5SEhHAiJmOD5mN1IOm9q4tu1xPbLsk+e32Y7c","hashing_algorithm":"rabbit_password_hashing_sha256","tags":""}],"vhosts":[{"name":"/"}],"permissions":[{"user":"skaben","vhost":"/","configure":".*","write":".*","read":".*"},{"user":"mqtt","vhost":"/","configure":".*","write":".*","read":".*"},{"user":"rabbitmq","vhost":"/","configure":".*","write":".*","read":".*"}],"topic_permissions":[{"user":"rabbitmq","vhost":"/","exchange":"","write":".*","read":".*"},{"user":"mqtt","vhost":"/","exchange":"","write":".*","read":".*"},{"user":"skaben","vhost":"/","exchange":"","write":".*","read":".*"}],"parameters":[],"global_parameters":[{"name":"cluster_name","value":"rabbit@rabbitmq"},{"name":"internal_cluster_id","value":"rabbitmq-cluster-id-0ZL3di6BX4XgSsnv0PHkXA"}],"policies":[],"queues":[],"exchanges":[{"name":"internal","vhost":"/","type":"direct","durable":true,"auto_delete":false,"internal":false,"arguments":{}},{"name":"mqtt","vhost":"/","type":"topic","durable":true,"auto_delete":false,"internal":false,"arguments":{}},{"name":"ask","vhost":"/","type":"topic","durable":true,"auto_delete":false,"internal":false,"arguments":{}},{"name":"websocket","vhost":"/","type":"topic","durable":true,"auto_delete":false,"internal":false,"arguments":{}},{"name":"log","vhost":"/","type":"direct","durable":true,"auto_delete":false,"internal":false,"arguments":{}}],"bindings":[{"source":"mqtt","vhost":"/","destination":"ask","destination_type":"exchange","routing_key":"ask.#","arguments":{}}]}
+{
+  "rabbit_version": "3.8.3",
+  "rabbitmq_version": "3.8.3",
+  "users": [
+    {
+      "name": "rabbitmq",
+      "password_hash": "9ZhIxZU+9b63eRLFwdyE0UcRo82AxafAY0TvduXZ5I6HoOAy",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    },
+    {
+      "name": "skaben",
+      "password_hash": "SZc4sPfm+yfnMPhen2mnGuY6BQjYvtnXGa2SyQ2UUzGMcTgg",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ""
+    },
+    {
+      "name": "mqtt",
+      "password_hash": "1Hc6ke+ZjkA5SEhHAiJmOD5mN1IOm9q4tu1xPbLsk+e32Y7c",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ""
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "skaben",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "mqtt",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "rabbitmq",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [
+    {
+      "user": "rabbitmq",
+      "vhost": "/",
+      "exchange": "",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "mqtt",
+      "vhost": "/",
+      "exchange": "",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "skaben",
+      "vhost": "/",
+      "exchange": "",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "rabbit@rabbitmq"
+    },
+    {
+      "name": "internal_cluster_id",
+      "value": "rabbitmq-cluster-id-0ZL3di6BX4XgSsnv0PHkXA"
+    }
+  ]
+}
