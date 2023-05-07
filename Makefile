@@ -4,6 +4,7 @@
 
 ACCENT  := $(shell tput -Txterm setaf 2)
 RESET := $(shell tput init)
+API_SERVICE := api
 
 #.EXPORT_ALL_VARIABLES:
 #include ${env}
@@ -15,16 +16,17 @@ fetch: ##  Скачать все репозитории -- требует инт
 	@git submodule foreach "git checkout main"
 	@git submodule foreach "git pull"
 
-build: ##  Собрать без кэша -- требует интернета
-	@docker-compose build --no-cache
+build: ##  Собрать
+	@docker-compose build
 
-rebuild: ##  Собрать без кэша, с удалением node_modules -- требует интернета
-	@docker-compose down front -v
+build-clean: ##  Собрать без кэша, с удалением node_modules -- требует интернета
+	@docker-compose down --remove-orphans
+	@docker volume rm skaben_node_modules
 	@docker-compose build --no-cache
 
 start: ##  Запуск всех сервисов
 	@mkdir -p logs/nginx tmp
-	@docker-compose up --force-recreate -d
+	@docker-compose up --force-recreate --remove-orphans -d
 	@docker-compose ps
 
 sh.%: ##  Открыть shell в указанном сервисе [sh.[service]]
@@ -34,13 +36,19 @@ exec: ##  Выполнение команды в указанном сервис
 	@docker-compose exec $$CMD
 
 migrate: ##  Применить миграции
-	@docker-compose exec back python manage.py migrate
+	@docker-compose exec ${API_SERVICE} python manage.py migrate
 
 migrations: ##  Создать новую миграцию
-	@docker-compose exec back python manage.py makemigrations
+	@docker-compose exec ${API_SERVICE} python manage.py makemigrations
+
+load_initial: ##  Загрузить базовые данные
+	@docker-compose exec ${API_SERVICE} python manage.py loaddata skaben_initial_data.json
+
+dump_initial: ##  Сохранить текущее состояние БД в слепок
+	@docker-compose exec ${API_SERVICE} python manage.py dumpdata alert core --indent 4 > skaben_dump.json
 
 superuser: ##  Создать юзера
-	@docker-compose exec back python manage.py createsuperuser
+	@docker-compose exec ${API_SERVICE} python manage.py createsuperuser
 
 stop:  ##  Остановка всех сервисов
 	@docker-compose down --remove-orphans

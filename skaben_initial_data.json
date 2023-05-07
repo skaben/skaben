@@ -1,0 +1,126 @@
+[
+{
+    "model": "alert.alertstate",
+    "pk": 1,
+    "fields": {
+        "name": "white",
+        "info": "игротехнический статус - НАСТРОЙКА ИГРЫ.",
+        "threshold": -1,
+        "current": true,
+        "order": 0,
+        "modifier": 0
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 2,
+    "fields": {
+        "name": "cyan",
+        "info": "Глубокая консервация, исходный статус на момент прихода игроков в данж.",
+        "threshold": -1,
+        "current": false,
+        "order": 1,
+        "modifier": 5
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 3,
+    "fields": {
+        "name": "blue",
+        "info": "К силовому щитку подключен вспомогательный источник питания.",
+        "threshold": -1,
+        "current": false,
+        "order": 2,
+        "modifier": 5
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 4,
+    "fields": {
+        "name": "green",
+        "info": "Реактор запущен. Основной статус для полноценных действия в данже.",
+        "threshold": 1,
+        "current": false,
+        "order": 3,
+        "modifier": 25
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 5,
+    "fields": {
+        "name": "yellow",
+        "info": "Предтревожное состояние, иногда включаются оповещения, замки и терминалы усложнились в плане прохождения.",
+        "threshold": 500,
+        "current": false,
+        "order": 4,
+        "modifier": 50
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 6,
+    "fields": {
+        "name": "red",
+        "info": "Полноценная тревога. Максимальный уровень сложности терминалов, работают высокоуровневые коды допуска.",
+        "threshold": 1000,
+        "current": false,
+        "order": 5,
+        "modifier": 100
+    }
+},
+{
+    "model": "alert.alertstate",
+    "pk": 7,
+    "fields": {
+        "name": "black",
+        "info": "игротехнический статус - КОНЕЦ ИГРЫ. Работает система самоликвидации базы, никакие действия игроков не могу спасти тех, кто находится на территории данжа.",
+        "threshold": -1,
+        "current": false,
+        "order": 6,
+        "modifier": 0
+    }
+},
+{
+    "model": "core.devicetopic",
+    "pk": 1,
+    "fields": {
+        "channel": "lock",
+        "type": "smart",
+        "active": true,
+        "comment": "замок лазерной двери"
+    }
+},
+{
+    "model": "core.devicetopic",
+    "pk": 2,
+    "fields": {
+        "channel": "rgb",
+        "type": "simple",
+        "active": true,
+        "comment": "люстры RGB (свет, сирена, строб)"
+    }
+},
+{
+    "model": "core.devicetopic",
+    "pk": 3,
+    "fields": {
+        "channel": "pwr",
+        "type": "simple",
+        "active": true,
+        "comment": "щиток питания, переключает cyan -> blue -> green состояния"
+    }
+},
+{
+    "model": "core.devicetopic",
+    "pk": 4,
+    "fields": {
+        "channel": "scl",
+        "type": "simple",
+        "active": true,
+        "comment": "шкала индикации уровня тревоги"
+    }
+}
+]
