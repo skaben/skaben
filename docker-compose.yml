@@ -55,6 +55,10 @@ services:
     <<: *worker
     command: python manage.py start_worker mqtt
 
+  scheduler:
+    <<: *worker
+    command: python manage.py start_scheduler
+
   front:
     image: 'skaben-front:latest'
     build:
