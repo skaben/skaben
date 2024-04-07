@@ -1,6 +1,4 @@
-FROM rabbitmq:3.8.9-management-alpine
-
-ENV RABBITMQ_VERSION=3.8.3
+FROM rabbitmq:3.13.1-management-alpine
 
 COPY ./rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
 COPY ./definitions.json /etc/rabbitmq/definitions.json
