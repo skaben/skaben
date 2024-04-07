@@ -1,6 +1,4 @@
 {
-  "rabbit_version": "3.8.3",
-  "rabbitmq_version": "3.8.3",
   "users": [
     {
       "name": "rabbitmq",

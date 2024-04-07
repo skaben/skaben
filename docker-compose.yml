@@ -87,13 +87,13 @@ services:
 
   rabbitmq:
     build: './docker_build/rabbitmq'
-    hostname: "rabbitmq"
+    hostname: rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping -n rabbit@localhost
-      interval: 20s
-      timeout: 20s
-      retries: 5
-      start_period: 20s
+      test: rabbitmq-diagnostics -q ping -n rabbit@rabbitmq
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
     ports:
       - "15672:15672"
       - "15674:15674"
@@ -116,11 +116,12 @@ services:
 
   db:
     image: postgres:13.4
+    hostname: db
     restart: unless-stopped
     healthcheck:
-      test: pg_isready
-      interval: 15s
-      timeout: 15s
+      test: pg_isready -U skaben # check .env
+      interval: 10s
+      timeout: 10s
       retries: 5
       start_period: 15s
     volumes:
