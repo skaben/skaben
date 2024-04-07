@@ -59,6 +59,12 @@ restart.%: ##  Перезапустить сервис [restart.[service]]
 info:  ##  Показать список сервисов
 	@docker-compose ps -a
 
+logs-backend:  ##  Показать логи воркеров и API
+	@docker-compose logs -f scheduler worker_send worker_save worker_mqtt api
+
+lint-backend:  ##  Проверка синтаксиса бэкенда
+	@docker-compose run --rm api flake8 .
+
 help:
 	@echo "\nКоманды:\n"
 	@grep -E '^[a-zA-Z.%_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%2s$(ACCENT)%-20s${RESET} %s\n", " ", $$1, $$2}'

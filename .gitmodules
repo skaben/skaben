@@ -11,3 +11,5 @@
 [submodule "server_panel"]
 	path = server_panel
 	url = git@github.com:skaben/server_panel.git
+        update = merge
+        branch = main
