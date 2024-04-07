@@ -21,7 +21,7 @@ build: ##  Собрать
 
 build-clean: ##  Собрать без кэша, с удалением node_modules -- требует интернета
 	@docker-compose down --remove-orphans
-	@docker volume rm skaben_node_modules
+	@docker volume rm skaben_node_modules 2> /dev/null || true
 	@docker-compose build --no-cache
 
 start: ##  Запуск всех сервисов
