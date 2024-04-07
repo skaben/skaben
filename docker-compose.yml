@@ -149,6 +149,25 @@ services:
     networks:
       - network_public
 
+  panel:
+    image: 'skaben-panel:latest'
+    restart: unless-stopped
+    build:
+      context: server_panel/.
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_HTTP_PORT=5000
+#      - ASPNETCORE_HTTPS_PORTS=5001
+    depends_on:
+      - api 
+    networks:
+      - network_public
+      - network_backbone
+    ports:
+      - "5000:5000"
+      
 volumes:
   db_volume: {}
   redis_data: {}
