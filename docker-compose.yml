@@ -22,7 +22,7 @@ services:
       - network_public
       - network_backbone
     command: |
-      sh -c "/opt/app/entrypoint.sh"
+      sh -c "/opt/scripts/entrypoint.sh"
 
   worker:
     <<: &worker
@@ -114,16 +114,16 @@ services:
       - "5432:5432"
     env_file: "server_core/.env"
 
-  portainer:
-    image: portainer/portainer-ce:latest
-    networks:
-      - network_public
-    ports:
-      - "9000:9000"
-    volumes:
-      - portainer_volume:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   networks:
+  #     - network_public
+  #   ports:
+  #     - "9000:9000"
+  #   volumes:
+  #     - portainer_volume:/data
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   restart: unless-stopped
 
   nginx:
     build: './docker_build/nginx'
