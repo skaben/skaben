@@ -5,6 +5,7 @@
 ACCENT  := $(shell tput -Txterm setaf 2)
 RESET := $(shell tput init)
 API_SERVICE := api
+WORKERS := scheduler worker_internal worker_send worker_save worker_mqtt
 
 #.EXPORT_ALL_VARIABLES:
 #include ${env}
@@ -42,10 +43,10 @@ migrations: ##  Создать новую миграцию
 	@docker-compose exec ${API_SERVICE} python manage.py makemigrations
 
 load_initial: ##  Загрузить базовые данные
-	@docker-compose exec ${API_SERVICE} python manage.py loaddata skaben_initial_data.json
+	@docker-compose exec ${API_SERVICE} python manage.py loaddata skaben_data.json
 
 dump_initial: ##  Сохранить текущее состояние БД в слепок
-	@docker-compose exec ${API_SERVICE} python manage.py dumpdata alert core --indent 4 > skaben_dump.json
+	@docker-compose exec ${API_SERVICE} python manage.py dumpdata alert core --indent 4 > skaben_data.json
 
 superuser: ##  Создать юзера
 	@docker-compose exec ${API_SERVICE} python manage.py createsuperuser
@@ -56,11 +57,14 @@ stop:  ##  Остановка всех сервисов
 restart.%: ##  Перезапустить сервис [restart.[service]]
 	@docker-compose up --force-recreate --remove-orphans -d $*
 
+restart-workers: ##  Перезапустить воркеров
+	@docker-compose up --force-recreate --remove-orphans -d ${WORKERS}
+
 info:  ##  Показать список сервисов
 	@docker-compose ps -a
 
 logs-backend:  ##  Показать логи воркеров и API
-	@docker-compose logs -f scheduler worker_send worker_save worker_mqtt api
+	@docker-compose logs -f ${WORKERS} api
 
 lint-backend:  ##  Проверка синтаксиса бэкенда
 	@docker-compose run --rm api flake8 .

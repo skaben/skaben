@@ -8,6 +8,12 @@ services:
     build:
       context: server_core/.
       target: api_build
+    healthcheck:
+      test: python manage.py check_integrity
+      interval: 1m30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
     env_file: 'server_core/.env'
     volumes:
       - ./server_core:/opt/app
@@ -27,7 +33,7 @@ services:
     command: |
       sh -c "/opt/app/entrypoint.sh"
 
-  worker:
+  worker_internal:
     <<: &worker
       image: 'skaben-api:latest'
       build:
