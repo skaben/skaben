@@ -12,6 +12,7 @@ WORKERS := scheduler worker_internal worker_send worker_save worker_mqtt
 #export $(shell sed 's/=.*//' ${env})
 
 fetch: ##  Скачать все репозитории -- требует интернета
+	@git pull
 	@git submodule init
 	@git submodule update --remote
 	@git submodule foreach "git checkout main"
