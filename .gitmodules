@@ -3,11 +3,6 @@
         url = ../server_core.git
         update = merge
         branch = main
-[submodule "front"]
-        path = server_front
-        url = ../server_front.git
-        update = merge
-        branch = main
 [submodule "server_panel"]
 	path = server_panel
 	url = git@github.com:skaben/server_panel.git

@@ -71,24 +71,6 @@ services:
     <<: *worker
     command: python manage.py start_scheduler
 
-  front:
-    image: 'skaben-front:latest'
-    build:
-      context: server_front/.
-    environment:
-      - CHOKIDAR_USEPOLLING=True
-      - VUE_HOST=0.0.0.0
-      - VUE_PORT=3000
-    command: |
-      sh -c "yarn run dev"
-    volumes:
-      - ./server_front/app:/app
-      - ./server_front/app/dist:/app/dist
-      - node_modules:/app/node_modules
-      - static_volume:/static
-    networks:
-      - network_public
-
   ### INFRASTRUCTURE ###
 
   rabbitmq:
@@ -151,7 +133,6 @@ services:
       - static_volume:/static
     depends_on:
       - api
-      - front
       - rabbitmq
     networks:
       - network_public
