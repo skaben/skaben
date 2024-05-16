@@ -30,7 +30,7 @@ build-clean: ##  Собрать без кэша, с удалением node_modu
 	@docker-compose build --no-cache
 
 .PHONY: start
-start: ##  Запуск всех сервисов
+start: stop ##  Запуск всех сервисов
 	@mkdir -p logs/nginx tmp
 	@docker-compose up --force-recreate --remove-orphans -d
 	@docker-compose ps
