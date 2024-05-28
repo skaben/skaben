@@ -57,7 +57,7 @@ load_initial: ##  Загрузить базовые данные
 
 .PHONY: dump_initial
 dump_initial: ##  Сохранить текущее состояние БД в слепок
-	@docker-compose exec ${API_SERVICE} python manage.py dumpdata alert core peripheral_devices --indent 4 > skaben_data.json
+	@docker-compose exec ${API_SERVICE} python manage.py dumpdata alert core peripheral_devices peripheral_behavior --indent 4 > skaben_data.json
 
 .PHONY: superuser
 superuser: ##  Создать юзера
