@@ -1,0 +1,838 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Операционная документация SKABEN">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Description - SKABEN Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SKABEN Docs" class="md-header__button md-logo" aria-label="SKABEN Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SKABEN Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Description
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SKABEN Docs" class="md-nav__button md-logo" aria-label="SKABEN Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SKABEN Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Домашняя
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Развертывание
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Эксплуатация
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Эксплуатация
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Оглавление
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/addressing.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Адресация
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/client_devices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Устройства
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/powerbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Щиток
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Замок
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/light_array/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Массив освещения
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Шкала
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/alert_status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Статусы тревоги
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/terminal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Терминал
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operating/operator_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Руководство оператора
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Разработка
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Разработка
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Оглавление
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/addressing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Адресация
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/transport/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Транспорт
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Description</h1>
+
+<p>Объект "Контур" - военно-исследовательская база высшей категории защиты, оснащённая автономными системами питания и жизнеобеспечения на случай глобального военного конфликта, системой защиты от проникновения, а также системой самоликвидации.</p>
+<p>Основными элементами объекта "Контур" являются ядерный реактор, заглушающийся на случай глубокой консервации объекта, и аварийный резервный источник питания на химических элементах однократного действия, обеспечивающий объект питанием на 30 минут с момента запуска, и необходимый в процессе пуска реактора из режима глубокой консервации. По окончанию срока действия аварийного источника, его элементы подлежат замене. В случае, если источник выработал свой ресурс, а реактор объекта не был запущен, объект возвращается в режим глубокой консервации, или запускается система самоликвидации - в зависимости от установок, заданных при первоначальной консервации объекта.</p>
+<p>Запуск аварийного источника питания и главного реактора объекта выполняется с соответствующих пультов авторизованным персоналом при помощи личных кодов и/или ключ-карт.</p>
+<p>Основой системы контроля доступа объекта "Контур" являются генераторы силовых защитных полей, обладающие крайне низким энергопотреблением в режиме генерации, обеспечивающие полную непроницаемость между секторами и способные выдерживать существенные нагрузки. Поле деактивируется на небольшое время (обычно 10 секунд) при введении с клавиатуры замка кода или прикладыванием авторизованной ключ-карты. В случае объявления тревоги по объекту большинство кодов и ключ-карт блокируется за исключением таковых у высшего командного состава объекта.</p>
+<p>Основной системой автономной защиты объекта "Контур" в режиме консервации являются минные поля. как управляемый с центрального компьютера объекта так и автономные. В "зелёном" режиме функционирования базы управляемый центральным компьютером поля деактивированы, автономные деактивируются инженерами-саперами в соответствии с картой первоначальной установки. Возможно применение экспериментальных автономных охранных систем, как стационарных, так и мобильных.</p>
+<p>Различают следующие режимы функционирования объекта:</p>
+<ul>
+<li>
+<p>"Синий". Режим глубокой консервации, реактор заглушен, управляемые минные поля активированы, питание на внутренние элементы базы не подаётся, за исключением замков. Доступ персонала ограничен помещениями объекта, необходимыми для запуска аварийного источника питания и реактора. Работает аварийное освещение синего цвета, энергий на основное освещение не подаётся.</p>
+</li>
+<li>
+<p>"Голубой". Функционирует аварийный химический источник питания объекта. Время работы источника - 30 минут. По истечении срока работы батарей, объект переходит либо в "Синий" режим, либо активирует самоликвидацию, в зависимости от заданных при первоначальной консервации параметров (см. режим "Чёрный"). При активации источника работает дежурное освещение голубого свечения, а также подаётся питание на компьютерные терминалы объекта и ограниченно - на основное освещение. Управляемые минные поля активированы. Персоналу рекомендуется избегать зон размещения датчиков и зарядов (см.карту установки минных полей).</p>
+</li>
+<li>
+<p>"Зелёный". Основное режим работы объекта. Управляемые минные поля деактивированы. Замки по авторизованным кодам и ключ-картам обеспечивают доступ персонала во все помещения базы, компьютерные терминалы и основное освещение получают питание в полном объёме, дежурное освещение работает на полную мощность. </p>
+</li>
+<li>
+<p>"Желтый". Начальный уровень тревоги. Активированы управляемые минные поля. Дежурное освещение - жёлтое. Циклически подаются световые и звуковые сигналы тревоги. Ряд замков блокируется, кроме ключ-карт высшего командного состава. Охрана базы должна локализовать и устранить угрозу. После доклада начальника охраны, дежурный офицер базы в звании не ниже полковника, своей личной картой может вернуть базе "Зелёный" статус.</p>
+</li>
+<li>
+<p>"Красный". Тревога и сигнал к эвакуации базы. База с помощью замков разделена на изолированные отсеки, работают только карты высшего уровня доступа. Звуковые и световые тревоги подаются непрерывно, дежурное освещение красное. Через 15 минут от перехода базы в это состояние включается режим самоликвидатора (см. режим "Чёрный"). Управляемые минные поля активны. </p>
+</li>
+<li>
+<p>"Чёрный". Режим самоликвидации базы. Все замки и терминалы блокированы. Основное и дежурное освещение погашено, сигналы тревоги подаются непрерывно. Применяются биологические нейтрализаторы короткого срока распада, сверхактивные химические вещества и радиационные стерилизаторы на всей территории объекта. После окончания цикла база переходит в режим глубокой консервации с первоначальными настройками.</p>
+</li>
+</ul>
+<p><strong>Описание прохождения миссии.</strong></p>
+<p>Ты стоишь в тѐмном-тѐмном помещении. У тебя нет ни еды, ни воды, ни оружия, ни источника света. Все твои товарищи мертвы. Один неверный шаг, и ты летишь прямиком в бездну, глубину которой измерить никто не мог до сих пор. </p>
+<p>Шучу. </p>
+<p>Слушай сюда. Объект "Контур" - это просто база. Ну хорошо. Не просто база, а военная база. Точнее экспериментальная военная база. Может на ней какие исследования проводили, а может это был запасной пост управления какимто чудовищным оружием, который так по тревоге и не успели занять штатно. А может успели, да потом что-то не так пошло. Или просто склад ценностей - никто тебе этого теперь не расскажет. Вот войдѐшь и посмотришь. Да, объект на консервации. Или его успели законсервировать, или он сам в это состояние ушѐл, когда никого из персонала не осталось - тоже, уже никто не знает. </p>
+<p>Так вот. Консервация - это когда заглушен реактор, и, кстати, просто так его на запустишь. И работает дверь только в технические помещения объекта, ага. Двери, кстати, тоже необычные. Экспериментальный силовые поля. Задел случайно - и всѐ, только лѐгкий пепел на бетон упал вместо тебя. Так что перво-наперво тебе надо найти ключ карту от входной двери. Ну или код у кого узнать. Там для особо тупых - и код обычно был, правда, не ко всем дверям коды были, некоторые, говорят, только картами и открывались. Ну так вот. Если к клавиатуре приложить правильную карту, или набрать верный код... Да не пугайся ты так - про домофоны слыхал, в прошлом такие приборы были? Ну так вот, код обычно 4 знака, закончить надо знаком "решетка" #. Если начал неправильно набирать - нажимай "звездочку" * и всѐ по новой. А карту надо просто приложить к клавиатуре. Если поле не исчезло - ещѐ раз попробовать, иногда не сразу срабатывает - лет то уже сколько прошло. Поле исчезло - проходи, не мешкай, оно обычно 10 секунд открытым проход держит, а потом снова - только в пепел, если что. Но опять же - лет прошло сколько, может и три секунды у тебя будет, а может и пять. </p>
+<p>Перво-наперво тебе надо запустить реактор. Процесс сам по себе несложный, всѐ автоматика сделает. Тебе надо только опять же найти нужную ключ-карту или код. Кстати. код может быть где и записан, да и ключ-карты такие я не слышал, чтобы выносили с объекта - так что где-то там лежит. И это, под ноги смотри. Там основная система охраны - мины всех сортов и видов. Так что если в пепел не превратишься на входе, то здесь в кровавую лепѐшку на потолке - да запросто. </p>
+<p>Ну так вот. Да, кода от реактора тебе мало. Для того, чтобы реактор запустить - худо бедно энергия требуется. Для этого там одноразовые батарейки предусмотрены. Ну как батарейки - весом каждая с тебя, и работают всего полчаса, если в идеале. А сейчас - как повезѐт. На них отдельный пульт на запуск есть, "аварийное питание" называется. И ты это, если код или карту от реактора сразу не нашѐл, как аварийное питание запустишь - в компьютеры, какие остались, потыкайся. Вояки иногда коды друг другу письмами пересылали. А может и ещѐ чего полезного узнаешь. </p>
+<p>В итоге тебе нужно будет уже внутри найти код или карту от реактора, код или карту от аварийного питания. То есть - идѐшь сначала к пульту управления аварийным питанием, и его включаешь. Что включилось понять просто - свет с тускло-синего на поярче сменится, а там может и часть ламп мерцать перестанет. Ну и компьютеры оживут, это я уже говорил. Вот как это сработало - сразу к пульту запуска реактора. Если от него ни кода, ни карты не нашѐл - проверь компьютер. И запускай реактор. Если вдруг не успел, и батарейки кончились - свет опять тускло-синим стал, не отчаивайся вконец. Обычно запасные элемента там же, в какой-нибудь коморке стояли. Только надо найти точку подключения - ну и не надорваться, батареечку-то таскаючи. </p>
+<p>Хуже, если объект после отработки элемента питания в цикл самостерилизации уйдѐт - ну тогда тебе уже пофиг будет. И на батарейки, и на реактор, и на объект. Мѐртвым всѐ пофиг, вообще-то. От запущенного реактора свет сменится на такой зеленоватый, все лампы загорятся нормально, и если у тебя карты уровнем повыше, чем от входной двери есть - то ими ты открывать двери дальше сможешь. Или, опять же, посмотри в компьютер - там может много чего интересного быть. Ну а дальше - шарься повсюду, куда войти сможешь, только имей ввиду. Если ты компьютеру базы не понравишься - он тревогу включит. Свет станет желтым, и иногда будут сирены орать и маячки сигнальные моргать. В лучшие времена охрана бы прибежала и в допросную тебя. А сейчас - просто часть карточек работать перестанет. Ну да карточка командира базы аж при подготовке самоликвидатора будет работать - только еѐ ещѐ найти надо. </p>
+<p>Ну и да - ты про мины, надеюсь, не забыл? Ну вот и не забывай ни на секунду, пока на объекте находишься. Так вот, я бы на твоѐм месте в этот момент сваливать бы начал, от греха подальше - если выпустит тебя объект, конечно. А то ведь если свет красным загорится, и сирены чаще орать начнут - почитай уже ничем ни одну дверь не откроешь. Ну разве что очень повезло специальную карту найти. Ну а если свет погас и странный запах почуял - то это последнее, что ты в своей жизни испытаешь. Всѐ. Амба. База стерилизовала саму себя, и буду я эту историю следующему кандидату рассказывать. Глядишь, он и поудачливей будет. </p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
