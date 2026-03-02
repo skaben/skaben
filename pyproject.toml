@@ -1,0 +1,73 @@
+[project]
+name = "skaben-server"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    "amqp==5.2.0",
+    "asgiref==3.8.1",
+    "async-timeout==4.0.3",
+    "attrs==23.2.0",
+    "certifi==2024.2.2",
+    "charset-normalizer==3.3.2",
+    "click==8.1.7",
+    "deepdiff==6.7.1",
+    "Django==5.0.3",
+    "django-cors-headers==4.3.1",
+    "django-extensions==3.2.3",
+    "django-filter==24.2",
+    "django-polymorphic==4.0.0",
+    "djangorestframework==3.15.1",
+    "djangorestframework-jwt==1.11.0",
+    "django-rest-polymorphic==0.1.9",
+    "drf-spectacular==0.27.1",
+    "drf-spectacular[sidecar]==0.27.1",
+    "exceptiongroup==1.2.0",
+    "gunicorn==21.2.0",
+    "idna==3.6",
+    "inflection==0.5.1",
+    "jsonschema==4.21.1",
+    "jsonschema-specifications==2023.12.1",
+    "kombu==5.3.6",
+    "netaddr==1.2.1",
+    "ordered-set==4.1.0",
+    "packaging==24.0",
+    "pillow==10.3.0",
+    "psycopg2-binary==2.9.9",
+    "pydantic==2.6.4",
+    "PyJWT==1.7.1",
+    "pytz==2024.1",
+    "PyYAML==6.0.1",
+    "redis==5.0.3",
+    "referencing==0.34.0",
+    "requests==2.31.0",
+    "rpds-py==0.18.0",
+    "sqlparse==0.4.4",
+    "typing_extensions==4.10.0",
+    "uritemplate==4.1.1",
+    "urllib3==2.2.1",
+    "vine==5.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "django-stubs==5.0.0",
+    "iniconfig==2.0.0",
+    "mccabe==0.7.0",
+    "mypy==1.18.1",
+    "mypy_extensions==1.1.0",
+    "pathspec==0.12.1",
+    "platformdirs==4.2.0",
+    "pluggy==1.4.0",
+    "pycodestyle==2.11.1",
+    "pyflakes==3.2.0",
+    "pytest==8.1.1",
+    "pytest-django==4.8.0",
+    "pytest-mock==3.14.0",
+    "ruff==0.4.2",
+    "tomli==2.0.1",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple/"
+default = true

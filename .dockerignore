@@ -1,0 +1,7 @@
+.pre-commit-config.yaml
+docker-compose*
+LICENSE
+env.tmpl
+.env
+mkdocs.yml
+pytest.ini

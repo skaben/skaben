@@ -1,0 +1,2646 @@
+openapi: 3.0.3
+info:
+  title: SKABEN API
+  version: 1.0.0
+  description: SKABEN Dungeon API
+paths:
+  /api/alert/alert_counter/:
+    get:
+      operationId: api_alert_alert_counter_list
+      description: Alert counter viewset
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertCounter'
+          description: ''
+    post:
+      operationId: api_alert_alert_counter_create
+      description: Alert counter viewset
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertCounter'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertCounter'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertCounter'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertCounter'
+          description: ''
+  /api/alert/alert_counter/{id}/:
+    get:
+      operationId: api_alert_alert_counter_retrieve
+      description: Alert counter viewset
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: 'A unique integer value identifying this Тревога: счетчик уровня.'
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertCounter'
+          description: ''
+  /api/alert/alert_counter/get_latest/:
+    get:
+      operationId: api_alert_alert_counter_get_latest_retrieve
+      description: Alert counter viewset
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertCounter'
+          description: ''
+  /api/alert/alert_counter/purge_history/:
+    get:
+      operationId: api_alert_alert_counter_purge_history_retrieve
+      description: Alert counter viewset
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertCounter'
+          description: ''
+  /api/alert/alert_state/:
+    get:
+      operationId: api_alert_alert_state_list
+      description: Global alert state viewset
+      parameters:
+      - in: query
+        name: current
+        schema:
+          type: boolean
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertState'
+          description: ''
+  /api/alert/alert_state/{id}/:
+    get:
+      operationId: api_alert_alert_state_retrieve
+      description: Global alert state viewset
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: 'A unique integer value identifying this Тревога: именной статус.'
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertState'
+          description: ''
+  /api/alert/alert_state/{id}/set_current/:
+    post:
+      operationId: api_alert_alert_state_set_current_create
+      description: Set Alert State as current
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: 'A unique integer value identifying this Тревога: именной статус.'
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          description: No response body
+  /api/assets/audiofile/:
+    get:
+      operationId: api_assets_audiofile_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AudioFile'
+          description: ''
+    post:
+      operationId: api_assets_audiofile_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFile'
+          description: ''
+  /api/assets/audiofile/{uuid}/:
+    get:
+      operationId: api_assets_audiofile_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Аудио файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFile'
+          description: ''
+    put:
+      operationId: api_assets_audiofile_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Аудио файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AudioFile'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFile'
+          description: ''
+    patch:
+      operationId: api_assets_audiofile_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Аудио файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAudioFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAudioFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAudioFile'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFile'
+          description: ''
+    delete:
+      operationId: api_assets_audiofile_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Аудио файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/assets/hackgame/:
+    get:
+      operationId: api_assets_hackgame_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HackGame'
+          description: ''
+    post:
+      operationId: api_assets_hackgame_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HackGame'
+          description: ''
+  /api/assets/hackgame/{id}/:
+    get:
+      operationId: api_assets_hackgame_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Настройки мини-игры Fallout
+          Hack.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HackGame'
+          description: ''
+    put:
+      operationId: api_assets_hackgame_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Настройки мини-игры Fallout
+          Hack.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/HackGame'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HackGame'
+          description: ''
+    patch:
+      operationId: api_assets_hackgame_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Настройки мини-игры Fallout
+          Hack.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHackGame'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedHackGame'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedHackGame'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HackGame'
+          description: ''
+    delete:
+      operationId: api_assets_hackgame_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Настройки мини-игры Fallout
+          Hack.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/assets/imagefile/:
+    get:
+      operationId: api_assets_imagefile_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImageFile'
+          description: ''
+    post:
+      operationId: api_assets_imagefile_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+          description: ''
+  /api/assets/imagefile/{uuid}/:
+    get:
+      operationId: api_assets_imagefile_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Изображение.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+          description: ''
+    put:
+      operationId: api_assets_imagefile_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Изображение.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageFile'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+          description: ''
+    patch:
+      operationId: api_assets_imagefile_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Изображение.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedImageFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedImageFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedImageFile'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+          description: ''
+    delete:
+      operationId: api_assets_imagefile_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Изображение.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/assets/textfile/:
+    get:
+      operationId: api_assets_textfile_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TextFile'
+          description: ''
+    post:
+      operationId: api_assets_textfile_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextFile'
+          description: ''
+  /api/assets/textfile/{uuid}/:
+    get:
+      operationId: api_assets_textfile_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Текстовый файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextFile'
+          description: ''
+    put:
+      operationId: api_assets_textfile_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Текстовый файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TextFile'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextFile'
+          description: ''
+    patch:
+      operationId: api_assets_textfile_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Текстовый файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTextFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTextFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTextFile'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextFile'
+          description: ''
+    delete:
+      operationId: api_assets_textfile_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Текстовый файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/assets/userinput/:
+    get:
+      operationId: api_assets_userinput_list
+      description: Manage user input actions in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInput'
+          description: ''
+    post:
+      operationId: api_assets_userinput_create
+      description: Manage user input actions in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInput'
+          description: ''
+  /api/assets/userinput/{uuid}/:
+    get:
+      operationId: api_assets_userinput_retrieve
+      description: Manage user input actions in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательский интерфейс ввода.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInput'
+          description: ''
+    put:
+      operationId: api_assets_userinput_update
+      description: Manage user input actions in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательский интерфейс ввода.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInput'
+          description: ''
+    patch:
+      operationId: api_assets_userinput_partial_update
+      description: Manage user input actions in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательский интерфейс ввода.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserInput'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInput'
+          description: ''
+    delete:
+      operationId: api_assets_userinput_destroy
+      description: Manage user input actions in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательский интерфейс ввода.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/assets/videofile/:
+    get:
+      operationId: api_assets_videofile_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoFile'
+          description: ''
+    post:
+      operationId: api_assets_videofile_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoFile'
+          description: ''
+  /api/assets/videofile/{uuid}/:
+    get:
+      operationId: api_assets_videofile_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Видео файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoFile'
+          description: ''
+    put:
+      operationId: api_assets_videofile_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Видео файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VideoFile'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoFile'
+          description: ''
+    patch:
+      operationId: api_assets_videofile_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Видео файл.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVideoFile'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVideoFile'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVideoFile'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoFile'
+          description: ''
+    delete:
+      operationId: api_assets_videofile_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Видео файл.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/auth/token/:
+    post:
+      operationId: api_auth_token_create
+      description: Create a new auth token for user
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthToken'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthToken'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthToken'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+          description: ''
+  /api/behavior/account/:
+    get:
+      operationId: api_behavior_account_list
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TerminalAccount'
+          description: ''
+    post:
+      operationId: api_behavior_account_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalAccount'
+          description: ''
+  /api/behavior/account/{uuid}/:
+    get:
+      operationId: api_behavior_account_retrieve
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательское меню терминала.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalAccount'
+          description: ''
+    put:
+      operationId: api_behavior_account_update
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательское меню терминала.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TerminalAccount'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalAccount'
+          description: ''
+    patch:
+      operationId: api_behavior_account_partial_update
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательское меню терминала.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalAccount'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalAccount'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalAccount'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalAccount'
+          description: ''
+    delete:
+      operationId: api_behavior_account_destroy
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пользовательское меню терминала.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/behavior/menu/:
+    get:
+      operationId: api_behavior_menu_list
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuPolymorphic'
+          description: ''
+    post:
+      operationId: api_behavior_menu_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuPolymorphic'
+          description: ''
+  /api/behavior/menu/{uuid}/:
+    get:
+      operationId: api_behavior_menu_retrieve
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пункт меню.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuPolymorphic'
+          description: ''
+    put:
+      operationId: api_behavior_menu_update
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пункт меню.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MenuPolymorphic'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuPolymorphic'
+          description: ''
+    patch:
+      operationId: api_behavior_menu_partial_update
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пункт меню.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuPolymorphic'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuPolymorphic'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuPolymorphic'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuPolymorphic'
+          description: ''
+    delete:
+      operationId: api_behavior_menu_destroy
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Пункт меню.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/devices/lock/:
+    get:
+      operationId: api_devices_lock_list
+      description: Manage locks in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lock'
+          description: ''
+    post:
+      operationId: api_devices_lock_create
+      description: Manage locks in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lock'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lock'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lock'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lock'
+          description: ''
+  /api/devices/lock/{id}/:
+    get:
+      operationId: api_devices_lock_retrieve
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Лазерная дверь.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lock'
+          description: ''
+    put:
+      operationId: api_devices_lock_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Лазерная дверь.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lock'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Lock'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Lock'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lock'
+          description: ''
+    patch:
+      operationId: api_devices_lock_partial_update
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Лазерная дверь.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLock'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLock'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLock'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lock'
+          description: ''
+    delete:
+      operationId: api_devices_lock_destroy
+      description: Manage locks in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Лазерная дверь.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/devices/terminal/:
+    get:
+      operationId: api_devices_terminal_list
+      description: Manage terminals in database
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Terminal'
+          description: ''
+    post:
+      operationId: api_devices_terminal_create
+      description: Manage terminals in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+  /api/devices/terminal/{id}/:
+    get:
+      operationId: api_devices_terminal_retrieve
+      description: Manage terminals in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Терминал.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    put:
+      operationId: api_devices_terminal_update
+      description: Manage terminals in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Терминал.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Terminal'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    patch:
+      operationId: api_devices_terminal_partial_update
+      description: Manage terminals in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Терминал.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminal'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    delete:
+      operationId: api_devices_terminal_destroy
+      description: Manage terminals in database
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Терминал.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/streams/events/:
+    get:
+      operationId: api_streams_events_list
+      description: Events in database
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreamRecord'
+          description: ''
+    post:
+      operationId: api_streams_events_create
+      description: Events in database
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamRecord'
+          description: ''
+  /api/streams/events/{uuid}/:
+    get:
+      operationId: api_streams_events_retrieve
+      description: Events in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Игровое событие.
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamRecord'
+          description: ''
+    put:
+      operationId: api_streams_events_update
+      description: Events in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Игровое событие.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StreamRecord'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamRecord'
+          description: ''
+    patch:
+      operationId: api_streams_events_partial_update
+      description: Events in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Игровое событие.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStreamRecord'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStreamRecord'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStreamRecord'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamRecord'
+          description: ''
+    delete:
+      operationId: api_streams_events_destroy
+      description: Events in database
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Игровое событие.
+        required: true
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /ops/healthcheck/:
+    get:
+      operationId: ops_healthcheck_retrieve
+      tags:
+      - ops
+      responses:
+        '200':
+          description: No response body
+  /ops/update-devices/:
+    post:
+      operationId: ops_update_devices_create
+      description: Update devices by provided topics.
+      tags:
+      - ops
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    AlertCounter:
+      type: object
+      description: Global alert value counter
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        value:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Значение счетчика
+          description: Счетчик примет указанное значение, уровень тревоги может быть
+            сброшен
+        comment:
+          type: string
+          title: Причина изменений
+          maxLength: 64
+        timestamp:
+          type: string
+          format: date-time
+          title: Время последнего изменения
+      required:
+      - id
+    AlertState:
+      type: object
+      description: Global Alert State serializer
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название статуса
+          maxLength: 32
+        info:
+          type: string
+          title: Описание статуса
+          maxLength: 256
+        ingame:
+          type: boolean
+          title: Игровой статус
+          description: 'Будет ли статус автоматически изменяться системой счетчика
+            тревоги, или переключиться в него можно только специальным событием или
+            вручную. '
+        threshold:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: 'Порог срабатывания '
+          description: Нижнее значение счетчика счетчика тревоги для переключения
+            в статус. Чтобы отключить авто-переключение - выставьте значение ingame
+            = False
+        current:
+          type: boolean
+          title: Сейчас активен
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Порядок
+          description: используется для идентификации и упорядочивания статуса без
+            привязки к id в БД
+        auto_change:
+          allOf:
+          - $ref: '#/components/schemas/AutoChangeEnum'
+          title: Авто-изменение
+          description: |-
+            Включить автоматическое повышение или понижение тревоги со временем
+
+            * `increase` - Увеличивать
+            * `decrease` - Уменьшать
+        auto_level:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Значение авто-изменения
+          description: На сколько изменится уровень тревоги при авто-повышении или
+            авто-понижении
+        auto_timeout:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Таймаут авто-изменения
+          description: Частота срабатывания авто-изменения уровня в секундах
+        counter_increase:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Значение увеличения
+          description: На сколько повысится уровень тревоги при ошибке игрока.
+        counter_decrease:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Значение уменьшения
+          description: На сколько снизится уровень тревоги при удачном действии игрока.
+      required:
+      - id
+      - info
+      - name
+      - order
+    AudioFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+      required:
+      - file
+      - name
+    AuthToken:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        token:
+          type: string
+          readOnly: true
+      required:
+      - password
+      - token
+      - username
+    AutoChangeEnum:
+      enum:
+      - increase
+      - decrease
+      type: string
+      description: |-
+        * `increase` - Увеличивать
+        * `decrease` - Уменьшать
+    DifficultyEnum:
+      enum:
+      - 6
+      - 8
+      - 10
+      - 12
+      type: integer
+      description: |-
+        * `6` - easy
+        * `8` - normal
+        * `10` - medium
+        * `12` - hard
+    HackGame:
+      type: object
+      properties:
+        attempts:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        difficulty:
+          allOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          minimum: -2147483648
+          maximum: 2147483647
+        wordcount:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        chance:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+    ImageFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+      required:
+      - file
+      - name
+    Lock:
+      type: object
+      description: Lock serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+        hash:
+          type: string
+          readOnly: true
+        alert:
+          type: string
+          readOnly: true
+        online:
+          type: boolean
+          readOnly: true
+        acl:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+          nullable: true
+          title: IP-адрес
+        mac_addr:
+          type: string
+          readOnly: true
+          title: MAC
+        description:
+          type: string
+          title: Описание
+          maxLength: 128
+        timestamp:
+          type: integer
+          readOnly: true
+          title: Время последнего ответа
+        override:
+          type: boolean
+          title: Отключить авто-обновление
+        sound:
+          type: boolean
+          title: Звук замка
+        closed:
+          type: boolean
+          title: Закрыт
+        blocked:
+          type: boolean
+          title: Заблокирован
+        timer:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Время автоматического закрытия
+      required:
+      - acl
+      - alert
+      - hash
+      - id
+      - mac_addr
+      - online
+      - timestamp
+      - topic
+    MenuItemAudio:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/AudioFile'
+      required:
+      - content
+      - label
+    MenuItemAudioTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+        required:
+        - resourcetype
+      - $ref: '#/components/schemas/MenuItemAudio'
+    MenuItemImage:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/ImageFile'
+      required:
+      - content
+      - label
+    MenuItemImageTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+        required:
+        - resourcetype
+      - $ref: '#/components/schemas/MenuItemImage'
+    MenuItemText:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/TextFile'
+      required:
+      - content
+      - label
+    MenuItemTextTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+        required:
+        - resourcetype
+      - $ref: '#/components/schemas/MenuItemText'
+    MenuItemUserInput:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        input_label:
+          type: string
+          title: Заголовок поля ввода
+          description: Допустимая длина - 64 символа
+          maxLength: 64
+        input_description:
+          type: string
+          title: Текст на экране
+          description: Сообщение для пользователя на экране ввода (max 256 символов)
+          maxLength: 256
+      required:
+      - label
+    MenuItemUserInputTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+        required:
+        - resourcetype
+      - $ref: '#/components/schemas/MenuItemUserInput'
+    MenuItemVideo:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/VideoFile'
+      required:
+      - content
+      - label
+    MenuItemVideoTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+        required:
+        - resourcetype
+      - $ref: '#/components/schemas/MenuItemVideo'
+    MenuPolymorphic:
+      oneOf:
+      - $ref: '#/components/schemas/MenuItemAudioTyped'
+      - $ref: '#/components/schemas/MenuItemVideoTyped'
+      - $ref: '#/components/schemas/MenuItemImageTyped'
+      - $ref: '#/components/schemas/MenuItemTextTyped'
+      - $ref: '#/components/schemas/MenuItemUserInputTyped'
+      discriminator:
+        propertyName: resourcetype
+        mapping:
+          MenuItemAudio: '#/components/schemas/MenuItemAudioTyped'
+          MenuItemVideo: '#/components/schemas/MenuItemVideoTyped'
+          MenuItemImage: '#/components/schemas/MenuItemImageTyped'
+          MenuItemText: '#/components/schemas/MenuItemTextTyped'
+          MenuItemUserInput: '#/components/schemas/MenuItemUserInputTyped'
+    PatchedAudioFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+    PatchedHackGame:
+      type: object
+      properties:
+        attempts:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        difficulty:
+          allOf:
+          - $ref: '#/components/schemas/DifficultyEnum'
+          minimum: -2147483648
+          maximum: 2147483647
+        wordcount:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        chance:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+    PatchedImageFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+    PatchedLock:
+      type: object
+      description: Lock serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+        hash:
+          type: string
+          readOnly: true
+        alert:
+          type: string
+          readOnly: true
+        online:
+          type: boolean
+          readOnly: true
+        acl:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+          nullable: true
+          title: IP-адрес
+        mac_addr:
+          type: string
+          readOnly: true
+          title: MAC
+        description:
+          type: string
+          title: Описание
+          maxLength: 128
+        timestamp:
+          type: integer
+          readOnly: true
+          title: Время последнего ответа
+        override:
+          type: boolean
+          title: Отключить авто-обновление
+        sound:
+          type: boolean
+          title: Звук замка
+        closed:
+          type: boolean
+          title: Закрыт
+        blocked:
+          type: boolean
+          title: Заблокирован
+        timer:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          title: Время автоматического закрытия
+    PatchedMenuItemAudio:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/AudioFile'
+    PatchedMenuItemAudioTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+      - $ref: '#/components/schemas/PatchedMenuItemAudio'
+    PatchedMenuItemImage:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/ImageFile'
+    PatchedMenuItemImageTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+      - $ref: '#/components/schemas/PatchedMenuItemImage'
+    PatchedMenuItemText:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/TextFile'
+    PatchedMenuItemTextTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+      - $ref: '#/components/schemas/PatchedMenuItemText'
+    PatchedMenuItemUserInput:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        input_label:
+          type: string
+          title: Заголовок поля ввода
+          description: Допустимая длина - 64 символа
+          maxLength: 64
+        input_description:
+          type: string
+          title: Текст на экране
+          description: Сообщение для пользователя на экране ввода (max 256 символов)
+          maxLength: 256
+    PatchedMenuItemUserInputTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+      - $ref: '#/components/schemas/PatchedMenuItemUserInput'
+    PatchedMenuItemVideo:
+      type: object
+      properties:
+        timer:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+          title: Время доступа
+          description: Ограничение на просмотр этого контента в секундах
+        label:
+          type: string
+          title: Надпись на кнопке
+          maxLength: 128
+        content:
+          $ref: '#/components/schemas/VideoFile'
+    PatchedMenuItemVideoTyped:
+      allOf:
+      - type: object
+        properties:
+          resourcetype:
+            type: string
+      - $ref: '#/components/schemas/PatchedMenuItemVideo'
+    PatchedMenuPolymorphic:
+      oneOf:
+      - $ref: '#/components/schemas/PatchedMenuItemAudioTyped'
+      - $ref: '#/components/schemas/PatchedMenuItemVideoTyped'
+      - $ref: '#/components/schemas/PatchedMenuItemImageTyped'
+      - $ref: '#/components/schemas/PatchedMenuItemTextTyped'
+      - $ref: '#/components/schemas/PatchedMenuItemUserInputTyped'
+      discriminator:
+        propertyName: resourcetype
+        mapping:
+          MenuItemAudio: '#/components/schemas/PatchedMenuItemAudioTyped'
+          MenuItemVideo: '#/components/schemas/PatchedMenuItemVideoTyped'
+          MenuItemImage: '#/components/schemas/PatchedMenuItemImageTyped'
+          MenuItemText: '#/components/schemas/PatchedMenuItemTextTyped'
+          MenuItemUserInput: '#/components/schemas/PatchedMenuItemUserInputTyped'
+    PatchedStreamRecord:
+      type: object
+      description: Serializer for event objects
+      properties:
+        human_time:
+          type: string
+          readOnly: true
+        timestamp:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        message:
+          type: string
+          description: Название события
+        message_data:
+          nullable: true
+          description: Содержимое события
+        stream:
+          type: string
+          description: Поток события
+          maxLength: 256
+        source:
+          type: string
+          description: Источник события
+          maxLength: 256
+        mark:
+          type: string
+          description: Дополнительный маркер события
+          maxLength: 32
+    PatchedTerminal:
+      type: object
+      description: Terminal serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+        hash:
+          type: string
+          readOnly: true
+        alert:
+          type: string
+          readOnly: true
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TerminalAccount'
+        account_state_map:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+          nullable: true
+          title: IP-адрес
+        mac_addr:
+          type: string
+          readOnly: true
+          title: MAC
+        description:
+          type: string
+          title: Описание
+          maxLength: 128
+        timestamp:
+          type: integer
+          readOnly: true
+          title: Время последнего ответа
+        override:
+          type: boolean
+          title: Отключить авто-обновление
+        powered:
+          type: boolean
+          title: Питание подключено
+        blocked:
+          type: boolean
+          title: Устройство заблокировано
+    PatchedTerminalAccount:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        menu_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuPolymorphic'
+          readOnly: true
+        user:
+          type: integer
+          title: Пользователь
+        password:
+          type: string
+          nullable: true
+          title: Пароль
+          description: Для чтения пунктов меню потребуется известный пароль или успешный
+            взлом терминала
+        header:
+          type: string
+          maxLength: 64
+        footer:
+          type: string
+          maxLength: 64
+    PatchedTextFile:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Название файла
+          description: Это название файла будет видно игрокам.
+          maxLength: 128
+        file:
+          type: string
+          format: uri
+          nullable: true
+    PatchedUserInput:
+      type: object
+      description: Serializer for menu item objects
+      properties:
+        action:
+          type: string
+          title: Передаваемое значение
+          description: 'Значение будет передано в составе INFO пакета `action: <значение>`'
+          maxLength: 64
+        expected:
+          type: string
+          title: Ожидаемое значение
+          description: По этому значению может быть выполнена проверка поля `user_input`
+            INFO пакета
+          maxLength: 128
+        delay:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Задержка интерфейса пользователя
+    PatchedVideoFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+    StreamRecord:
+      type: object
+      description: Serializer for event objects
+      properties:
+        human_time:
+          type: string
+          readOnly: true
+        timestamp:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        message:
+          type: string
+          description: Название события
+        message_data:
+          nullable: true
+          description: Содержимое события
+        stream:
+          type: string
+          description: Поток события
+          maxLength: 256
+        source:
+          type: string
+          description: Источник события
+          maxLength: 256
+        mark:
+          type: string
+          description: Дополнительный маркер события
+          maxLength: 32
+      required:
+      - human_time
+      - message
+    Terminal:
+      type: object
+      description: Terminal serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        topic:
+          type: string
+          readOnly: true
+        hash:
+          type: string
+          readOnly: true
+        alert:
+          type: string
+          readOnly: true
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TerminalAccount'
+        account_state_map:
+          type: string
+          readOnly: true
+        ip:
+          type: string
+          nullable: true
+          title: IP-адрес
+        mac_addr:
+          type: string
+          readOnly: true
+          title: MAC
+        description:
+          type: string
+          title: Описание
+          maxLength: 128
+        timestamp:
+          type: integer
+          readOnly: true
+          title: Время последнего ответа
+        override:
+          type: boolean
+          title: Отключить авто-обновление
+        powered:
+          type: boolean
+          title: Питание подключено
+        blocked:
+          type: boolean
+          title: Устройство заблокировано
+      required:
+      - account_state_map
+      - accounts
+      - alert
+      - hash
+      - id
+      - mac_addr
+      - timestamp
+      - topic
+    TerminalAccount:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        menu_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuPolymorphic'
+          readOnly: true
+        user:
+          type: integer
+          title: Пользователь
+        password:
+          type: string
+          nullable: true
+          title: Пароль
+          description: Для чтения пунктов меню потребуется известный пароль или успешный
+            взлом терминала
+        header:
+          type: string
+          maxLength: 64
+        footer:
+          type: string
+          maxLength: 64
+      required:
+      - menu_items
+      - user
+      - uuid
+    TextFile:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Название файла
+          description: Это название файла будет видно игрокам.
+          maxLength: 128
+        file:
+          type: string
+          format: uri
+          nullable: true
+      required:
+      - name
+    UserInput:
+      type: object
+      description: Serializer for menu item objects
+      properties:
+        action:
+          type: string
+          title: Передаваемое значение
+          description: 'Значение будет передано в составе INFO пакета `action: <значение>`'
+          maxLength: 64
+        expected:
+          type: string
+          title: Ожидаемое значение
+          description: По этому значению может быть выполнена проверка поля `user_input`
+            INFO пакета
+          maxLength: 128
+        delay:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+          title: Задержка интерфейса пользователя
+    VideoFile:
+      type: object
+      properties:
+        file:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+      required:
+      - file
+      - name

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="flex flex-col gap-4 bg-gray-200 p-4 border border-solid rounded-xl">
+   <p class="text-xl text-gray-900">Загрузить CSV с пользователями</p>
+   <span class="flex flex-col gap-2">
+       <span>Формат CSV должен быть</span>
+       <code>user_name;user_description;access_code</code>
+       <a class='text-blue-500' href="{% url 'system:download_users_example_csv' %}">Скачать example.csv</a>
+   </span>
+    <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class='cursor-pointer px-6 py-2 text-lg bg-blue-100 font-bold mt-4' type="submit">Загрузить</button>
+    </form>
+  </div>
+{% endblock %}

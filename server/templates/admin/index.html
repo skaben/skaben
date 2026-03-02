@@ -1,0 +1,52 @@
+{% extends "admin/index.html" %}
+{% block extrahead %}
+<script>
+  function postData(url) {
+    const payload = {"topics": ["all"]};
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+    .then(response => {
+      console.log(response);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
+  }
+</script>
+<style>
+.skaben-overhead {
+    display: flex;
+    gap: 24px;
+    font-size: 1.25em;
+    font-family: monospace;
+    letter-spacing: 0.1px;
+    max-width: 800px;
+    padding: 8px 40px;
+    text-transform: uppercase;
+}
+</style>
+<div class="skaben-overhead">
+    <a href="http://{{ request.get_host }}" target="_blank">Операторская</a>
+    <span style="height: 1em; width: 1px; background: black;"></span>
+    <a href="http://{{ request.get_host }}:15672" target="_blank">RabbitMQ</a>
+    <span style="height: 1em; width: 1px; background: black;"></span>
+    <a id="postLink" href="#" onclick='postData("http://{{ request.get_host }}/ops/update-devices/")'>Send config all</a>
+    <span style="height: 1em; width: 1px; background: black;"></span>
+    <span style="display: inline-flex; gap: 16px; flex-grow: 1;">
+        <span>API docs:</span>
+        <a href="http://{{ request.get_host }}/api/schema/swagger-ui/" target="_blank">Swagger</a>
+        <a href="http://{{ request.get_host }}/api/schema/redoc/" target="_blank">Redoc</a>
+    </span>
+</div>
+{% endblock %}
+{% block content %}
+{{ block.super }}
+{% endblock %}
+{% block sidebar  %}
+{% endblock %}

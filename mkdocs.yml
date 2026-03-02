@@ -1,0 +1,29 @@
+site_name: SKABEN Docs
+site_description: Операционная документация SKABEN
+repo_name: skaben/skaben
+
+docs_dir: docs
+
+theme:
+  name: material
+
+nav:
+  - Домашняя: index.md
+  - Развертывание: deployment.md
+  - Эксплуатация:
+    - Оглавление: operating/index.md
+    - Адресация: operating/addressing.md
+    - Устройства: operating/client_devices.md
+    - Щиток: operating/powerbox.md
+    - Замок: operating/lock.md
+    - Массив освещения: operating/light_array.md
+    - Шкала: operating/scale.md
+    - Статусы тревоги: operating/alert_status.md
+    - Терминал: operating/terminal.md
+    - Руководство оператора: operating/operator_guide.md
+  - Разработка:
+    - Оглавление: development/index.md
+    - Адресация: development/addressing.md
+    - Транспорт: development/transport.md
+
+use_directory_urls: true

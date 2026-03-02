@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load static %}
+<link rel="stylesheet" type="text/css" href="{% static 'css/global.css' %}" />
+
+
+{% block content %}
+  <div class="flex items-center justify-center p-4 m-auto w-fit gap-8">
+    <p class="text-emerald-400">The CSV file was uploaded successfully. Users available:</p>
+    <ul>
+        {% for user in users %}
+        <li>{{ user.name }} - {{ user.description }}</li>
+        {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

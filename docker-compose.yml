@@ -1,24 +1,14 @@
-version: "3.6"
-
+---
 services:
 
   api:
     image: 'skaben-api:latest'
     restart: unless-stopped
-    build:
-      context: server_core/.
-      target: api_build
-    healthcheck:
-      test: python manage.py check_integrity
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 15s
-    env_file: 'server_core/.env'
+    env_file: '.env'
     volumes:
-      - ./server_core:/opt/app
+      - .:/opt/app/
       - static_volume:/static
-      - ./server_core/static:/static/static
+      - ./server/static:/static/static
       - files_volume:/media
     depends_on:
       db:
@@ -36,18 +26,10 @@ services:
   worker_internal:
     <<: &worker
       image: 'skaben-api:latest'
-      build:
-        context: server_core/.
-        target: base_build
-        cache_from:
-          - 'skaben-api'
-          - '*'
-      env_file: 'server_core/.env'
+      env_file: '.env'
       volumes:
-        - ./server_core:/opt/app
+        - ./server:/opt/app/server/
       depends_on:
-        api:
-          condition: service_healthy
         rabbitmq:
           condition: service_healthy
       networks:
@@ -74,7 +56,7 @@ services:
   ### INFRASTRUCTURE ###
 
   rabbitmq:
-    build: './docker_build/rabbitmq'
+    build: './docker/rabbitmq'
     hostname: rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q ping -n rabbit@rabbitmq
@@ -119,16 +101,15 @@ services:
       - network_backbone
     ports:
       - "5432:5432"
-    env_file: "server_core/.env"
+    env_file: ".env"
 
   nginx:
-    build: './docker_build/nginx'
+    build: './docker/nginx'
     restart: unless-stopped
     ports:
       - 80:80
       - 443:443
     volumes:
-      - ./docker_build/nginx/conf.d/:/etc/nginx/conf.d/
       - ./logs/nginx:/var/log/nginx
       - static_volume:/static
     depends_on:
@@ -139,35 +120,14 @@ services:
     networks:
       - network_public
 
-  panel:
-    image: 'skaben-panel:latest'
-    restart: unless-stopped
-    build:
-      context: server_panel/.
-      dockerfile: Dockerfile
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Release
-      - ASPNETCORE_URLS=http://+:5000
-      - ASPNETCORE_HTTP_PORT=5000
-    depends_on:
-      - api 
-    networks:
-      - network_public
-      - network_backbone
-    ports:
-      - "5000:5000"
-      
+
 volumes:
   db_volume: {}
   redis_data: {}
   static_volume: {}
   files_volume: {}
-  node_modules: {}
-  portainer_volume: {}
+
 
 networks:
-  network_backbone:
-  network_public:
-#    ipam:
-#      config:
-#        - subnet: 10.8.0.0/16
+  network_backbone: {}
+  network_public: {}
