@@ -1,0 +1,339 @@
+# AGENT REFERENCE: STREAMS
+
+Reviewed: 2026-08-24
+Scope: `server/streams` and direct dependencies
+Purpose: behavior map for preserving event-stream and operational-log contracts during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/event_contexts/.agent-review` before changing this area.
+3. Treat model, serializer, event encoding, worker persistence, and message settlement as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
+4. Preserve confirmed record fields, log source/level semantics, stream names, and chronological presentation, not public mutation, hidden identity, lost severity, unstable ordering, or accidental ACK-on-failure behavior.
+5. Keep event DTOs, append persistence, query API, administration, retention, redaction, and worker settlement separate.
+6. Make occurrence/recording time, ordering, immutability, validation, idempotency, concurrency, retries, retention, and access control explicit.
+
+## 1. Sources
+
+- Primary: `server/streams/{models,serializers,service,views,urls,admin,events}.py`
+- Persistence evidence: `server/streams/migrations/0001_initial.py`
+- API entrypoints: `/api/streams/events/`, `/api/streams/events/{uuid}/`, and custom Django admin
+- Runtime entrypoints: `InternalHandler.handle_event()`, `InternalHandler.handle_context_events()`, `SkabenEventContext.add_log_event()`, and `BaseHandler.send_log()`
+- Event dependencies: `server/core/transport/events.py`, `server/core/worker_queue_handlers/{base,internal}.py`, and event contexts under `server/event_contexts`
+- Time/transport dependencies: `server/core/helpers.py`, `server/core/transport/publish.py`, `server/core/urls.py`, `server/core/views.py`, and `server/settings.py`
+- Evidence: generated `schema.yml`, `server/tests/test_core/test_events.py`, `docs/development/transport.md`, and `skaben_data.json`; no stream-specific source tests, stream records in fixture, or authoritative stream API documentation were found
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `models.StreamTypes` | Define conventional stream strings `game` and `log` | model default and internal worker |
+| `models.StreamRecord` | Persist one UUID-addressed timestamped message with JSON data, stream, source, and mark | internal worker, serializer/API, admin |
+| `StreamRecord.human_time` | Render record epoch as timezone-adjusted `HH:MM:SS` | API and admin |
+| `serializers.StreamRecordSerializer` | Read/write every record field except UUID and expose computed time | viewset and legacy write service |
+| `service.write_event` | Legacy serializer-backed record creation with artificial timestamp offset | no source caller found |
+| `events` | Re-export core-owned `SkabenLogEvent` | no source consumer found |
+| `views.EventViewSet` | Expose CRUD, ordering, and search over all records | project API router |
+| `admin.StreamRecordAdmin` | List, filter, search, add, edit, and delete records | custom `base_site` |
+| `core.transport.events.SkabenLogEvent` | Define internal log event DTO and severity/save fields | worker handlers and event contexts |
+| `core.worker_queue_handlers.internal.InternalHandler` | Convert log events to `StreamRecord` objects and bulk insert them | internal RabbitMQ queue |
+| `core.worker_queue_handlers.base.BaseHandler.send_log` | Publish worker-generated log events back to internal queue | client-update and other workers |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| Inline context log | domain context `add_log_event()` | in-memory `SkabenLogEvent`, then bulk-inserted log record |
+| Worker log | `BaseHandler.send_log()` | broker round trip, decoded log record if publish/processing succeeds |
+| Direct incoming log | internal event with `event_type=log` | optional record according to `save` |
+| Mixed context effects | context emits logs and non-log events | log rows inserted first, follow-up events published second |
+| Legacy direct write | `streams.service.write_event(...)` | silent serializer save or silent discard |
+| REST CRUD/query | anonymous HTTP request | direct record create/read/update/delete/search/order |
+| Admin history management | authenticated admin action | direct add/edit/delete/query of records |
+
+## 3. Canonical Flows
+
+### Inline context log
+
+```text
+AlertEventContext / DeviceEventContext / LockEventContext
+  -> add_log_event(message, level, message_data)
+  -> SkabenLogEvent(event_source=<lowercase context class>, save=true)
+  -> InternalHandler.handle_context_events()
+  -> StreamRecord(
+       stream="log",
+       source=event_source,
+       mark=level,
+       message,
+       message_data,
+       timestamp=<server processing second>,
+       uuid=<new UUID>)
+  -> bulk_create()
+```
+
+These events remain Python objects between context and persistence, so `info`, `log`, and `error` levels are preserved. `message_data=None` becomes SQL/JSON null; a provided dictionary remains JSON. All log rows in one call receive defaults during object construction, normally the same second but distinct UUIDs.
+
+### Worker-generated log
+
+```text
+worker send_log(message, level, message_data, save)
+  -> SkabenLogEvent
+  -> encode headers: event_type, event_source, level
+  -> encode body: message, message_data, save
+  -> publish to internal queue
+  -> InternalHandler detects log
+  -> SkabenLogEvent.from_event_data(headers, body)
+  -> StreamRecord bulk insert
+```
+
+Observed severity defect: base `SkabenEvent.decode()` copies only header `event_type` and `event_source`; it does not copy `level`. Standard encoding excludes `level` from the body because it is a header. Reconstructed worker logs therefore use `SkabenLogEvent` default `info`, even when the sender requested `error` or `log`. Inline context logs do not cross this encode/decode boundary and keep their level.
+
+Worker `send_log()` uses source `worker_handler: <handler repr>` unless supplied. It coerces missing/falsy message data to `{}`. Broker publish errors are swallowed, so the originating worker receives no persistence result.
+
+### Direct log event
+
+```text
+internal message headers.event_type=log
+  -> decode/validate SkabenLogEvent
+  -> save=true: persist as stream="log" and return
+  -> save=false: fall through domain contexts, normally ignored, no record
+  -> source queue message ACK
+```
+
+There is no event ID, occurrence timestamp, correlation ID, causation ID, actor, device identity, schema version, or idempotency key. Record timestamp is time of server persistence preparation, not event occurrence or broker receipt. Duplicate delivery creates a new UUID and duplicate record.
+
+### Mixed context effects
+
+```text
+domain event
+  -> contexts mutate DB and generate [logs, follow-up events]
+  -> partition generated events
+  -> bulk insert all log records
+  -> publish non-log follow-up events in list order
+  -> source message ACK
+```
+
+There is no transaction joining earlier domain writes, log insert, follow-up publication, or source settlement. A log insert failure prevents later follow-up publishing, then escapes to `InternalHandler.handle_message()`, which logs to process output and ACKs the source message. A follow-up publish failure is swallowed after log rows remain committed.
+
+### Legacy `write_event()`
+
+```text
+write_event(stream, source, message, message_data, mark)
+  -> timestamp = server epoch + 1 second
+  -> coerce falsy message_data to {}
+  -> coerce falsy mark to ""
+  -> remove every falsy field
+  -> StreamRecordSerializer.validate/save
+  -> return None regardless of success/failure
+```
+
+The one-second offset intentionally attempts to make fast replies appear later, but it is not a sequence guarantee. Empty stream/source values are removed and silently become model defaults `game`/`default`; an empty message is removed and validation fails. Invalid serializer data is silently ignored. No source caller was found, so current game-stream production through this service is dormant.
+
+### REST query and mutation
+
+```text
+GET /api/streams/events/
+  -> all rows
+  -> optional ordering: timestamp, stream, source
+  -> optional search
+  -> default timestamp ascending
+  -> serializer excludes UUID
+
+POST/PUT/PATCH/DELETE
+  -> direct mutable StreamRecord history
+```
+
+Detail routes require the UUID primary key, but list/detail representations omit UUID. A client cannot discover the identifier needed to retrieve, update, or delete a row. There is no pagination, default time window, maximum result count, or stable secondary ordering.
+
+Search is configured for nonexistent field `level` plus `source`, `stream`, and `mark`. A nonempty search request builds an ORM lookup against `level` and fails with `FieldError` rather than returning results. Message text is not in API search fields. `DjangoFilterBackend` is installed, but no `filterset_fields` or filterset class is configured, so no exact filters are exposed; generated OpenAPI lists only `ordering` and `search`.
+
+### Admin query and mutation
+
+```text
+admin stream list
+  -> timestamp descending
+  -> display human_time, stream, source, mark, message
+  -> exact list filters and text search including message
+  -> default add/change/delete permissions
+```
+
+Admin and API use opposite default chronology: admin newest first, API oldest first. Both orders are ambiguous for records sharing a timestamp. Admin registration passes redundant `base_site` as a model-admin option even though registration is already invoked on `base_site`.
+
+## 4. Contracts
+
+### Stream record persistence
+
+- Primary key is random UUID generated in application code and not editable through model forms.
+- `timestamp` is a signed integer epoch second generated in application code by default. It is writable through API/admin and is not a database insertion timestamp.
+- `message` is a required `CharField` with no declared maximum length. Establish explicit backend-compatible text/length behavior before migration.
+- `message_data` is nullable/blank JSON with default `{}`. Current writers use both null and empty-object representations for absence.
+- `stream` defaults to `game` and allows up to 256 characters.
+- `source` defaults to `default` and allows up to 256 characters.
+- `mark` is blankable with maximum 32 characters; there is no explicit default, but omitted model/serializer values become empty string under current field behavior.
+- `StreamTypes.GAME="game"` and `StreamTypes.LOG="log"` are conventions, not model choices or database constraints. API/admin can persist any stream string.
+- Model defines no `Meta.ordering`, indexes, uniqueness beyond UUID, retention field, immutable flag, actor, or foreign keys.
+- UUID is unrelated to timestamp, so it cannot provide chronological tie-breaking by value.
+
+### Human time
+
+- `human_time` converts epoch through UTC and then `settings.TIME_ZONE`, formats `%Y-%m-%d %H:%M:%S`, and returns only the `HH:MM:SS` segment.
+- Current project timezone is UTC, but changing configuration changes the rendered value of historical records.
+- Date is deliberately omitted from `human_time`; clients must retain raw timestamp to distinguish days.
+- Invalid/out-of-platform-range timestamps can raise during serialization/admin display. API's database integer range still permits negative historical values.
+
+### Log event DTO
+
+- Wire event type is `log`; headers produced by standard encoding are `event_type`, `event_source`, and `level`.
+- Body fields are `message`, `message_data`, and `save`; standard encoding excludes all header fields.
+- Allowed levels are literal `error`, `log`, and `info`; default is `info`.
+- `event_source` and `message` are required strings without local length bounds. `message_data` is optional in type but has no default under Pydantic v2, so callers must supply it, including null.
+- `save` defaults true. False means no stream persistence under current internal routing.
+- Base decoder ignores `level` header. Body data is merged after event type/source and can override those two values if a nonstandard sender supplies them in the body.
+- `streams.events` re-exports a DTO owned by `core.transport.events`; ownership is inverted and the core source contains a TODO to move it to streams.
+
+### Internal persistence adapter
+
+- Only events whose class reports event type `log` become records. Every persisted internal log uses stream `log`.
+- Source maps from `event_source`; mark maps from level; message/data map directly.
+- Object-construction try/except does not perform Django validation. Length/JSON/database failures occur later during one `bulk_create()`.
+- One invalid record or database failure can fail the full batch. The failure is not caught inside the adapter.
+- `bulk_create()` bypasses model `save()`, validation, and any future save hooks.
+- Logs are inserted before generated non-log events are published.
+- There is no deduplication, conflict policy, retry record, or link to source queue delivery.
+
+### Legacy service
+
+- `write_event()` accepts arbitrary stream/source/mark, not `StreamTypes`/level enums.
+- It depends on the HTTP serializer for domain persistence.
+- It adds one second to server time and filters all falsy values, changing caller intent.
+- It does not return the record, UUID, validation errors, or a success boolean and produces no process log on failure.
+- No source caller was found.
+
+### REST API
+
+- Router base is `/api/streams/events/`; `ModelViewSet` exposes list, retrieve, create, update, partial update, and destroy.
+- `DynamicAuthMixin` is listed after `ModelViewSet`, so DRF/APIView methods shadow it.
+- If reordered, mixin methods still require a `request` argument although DRF calls them without one, and return authentication/permission classes rather than instances in non-dev mode.
+- Project default has token authentication but no default permission class, so anonymous requests are allowed. Development explicitly removes authentication/permissions. Generated OpenAPI declares no endpoint security.
+- Serializer excludes UUID from every request/response and adds read-only `human_time`.
+- API clients may set timestamp, message, message data, arbitrary stream/source/mark, then modify or delete those records later.
+- Default ordering is ascending timestamp. Allowed ordering fields are timestamp, stream, and source.
+- Search is currently broken by nonexistent field `level`; intended valid fields are source, stream, and mark.
+- There is no pagination, exact filterset, time-range constraint, stable `(timestamp, uuid)` order, rate limit, ownership, redaction, or audit of history mutation.
+
+### Admin
+
+- Default order is descending timestamp; list filters are stream/source/mark.
+- Admin search covers stream/source/mark/message.
+- Timestamp and all content/classification fields are editable; UUID is hidden because model marks it non-editable.
+- Default add/change/delete behavior means records are not append-only even for staff.
+- No retention, export, redaction, legal hold, bulk archive, or immutable-audit workflow exists.
+
+### Query/storage operations
+
+- No indexes support timestamp ordering, stream/source/mark filters, or text search. UUID primary-key index is the only explicit index.
+- Full unpaginated API reads and `icontains` searches can grow without bound.
+- No cleanup task, TTL, partition, archival sink, storage quota, payload-size limit, or health metric exists.
+- Arbitrary JSON and messages can contain credentials, access codes, personal/game data, stack details, or device identifiers; public read access exposes all stored content.
+- Fixture contains no stream records, so fixture does not characterize production volume, retention, ordering ties, or payload variants.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Worker sends `error`/`log` severity through broker | Decoder drops header level; stored mark becomes `info` | Decode every declared header and test round-trip severity |
+| Anonymous stream API request | Full read/create/forge/edit/delete access | Explicit authenticated read role; append/admin mutation policies |
+| Client needs detail UUID | UUID omitted from list/detail payload | Expose stable UUID as read-only field |
+| API `search` supplied | ORM resolves nonexistent `level`; request fails | Search actual fields or map level to mark intentionally |
+| Large history list | Entire queryset serialized oldest-first | Indexed cursor pagination, bounded default window, newest-first policy if chosen |
+| Multiple records share timestamp | Relative order is database-dependent | Stable `(timestamp, uuid/sequence)` ordering contract |
+| Domain log batch contains invalid DB value | Whole `bulk_create` fails; source event later ACKs | Validate before insert; typed failure/retry/quarantine policy |
+| Stream database temporarily unavailable | Domain/log/follow-up chain raises; source message ACKs | Required-log retry/outbox policy or explicit best-effort separation |
+| Follow-up event publish fails after logs save | Logs remain, follow-up lost, source ACKs | Transactional effect ledger/outbox and observable retry |
+| Duplicate source event delivery | New UUID creates duplicate log | Event/idempotency key or explicitly accepted at-least-once semantics |
+| Log publisher fails | `send_log()` caller cannot observe loss | Return/record delivery status and retry important logs |
+| `save=false` log | Falls through contexts and disappears without metric | Explicit typed discard path and observability |
+| `write_event()` validation fails | Silent no-op and `None` return | Typed result/error; remove dead adapter or use repository |
+| Empty stream/source passed to service | Filter removes them; defaults silently reclassify record | Preserve explicit values or reject invalid classification |
+| Service timestamp offset collides/reorders | Artificial future second does not define sequence | Separate occurred/recorded time and durable monotonic sequence |
+| Public/staff record update | Historical evidence changes in place | Append-only storage; correction/tombstone event with actor |
+| Public/staff record delete | History disappears without audit | Protected deletion, retention workflow, or audited tombstone |
+| Arbitrary stream/mark/source | Taxonomy drifts; queries become unreliable | Versioned validated taxonomy with extension policy |
+| `message_data` absent | Depending on writer, stored as null or `{}` | Define one semantic representation or preserve explicit distinction |
+| Oversized/sensitive payload | Stored indefinitely and publicly exposed | Size limits, classification/redaction, access control, retention |
+| Invalid timestamp serialized | Time conversion may raise and break result page | Validate range on write; safe rendering fallback |
+| Retention never runs | Table/query/storage grow without bound | Retention/archival policy with metrics and legal exceptions |
+
+- Concurrency/order: UUIDs prevent primary-key collision but provide no ingestion sequence. Second-resolution timestamps collide routinely, default ordering differs between API/admin, and duplicate deliveries are not detected.
+- Reliability: stream persistence shares internal-worker failure/ACK behavior. No transaction/outbox joins domain effects, record inserts, follow-up publication, or queue settlement; no retry/DLQ/poison ledger exists for records.
+- Security/operations: history and potentially sensitive JSON are anonymously readable and mutable. There is no immutable audit trail of API/admin changes, payload classification, redaction, retention, export control, or volume protection.
+
+## 6. Gaps
+
+- Tests: no stream tests cover model/serializer fields, UUID visibility, ordering ties, search/filtering, authorization, CRUD immutability, admin, indexing assumptions, or retention.
+- Tests: no round-trip test proves log event source/level/message/data/save preservation through encode, broker body/headers, decode, and persistence.
+- Tests: no worker test characterizes batch failure, database outage, duplicate delivery, mixed log/follow-up ordering, publish failure, or final ACK/reject behavior.
+- Docs: transport docs describe internal events but not stream persistence, taxonomy, query API, access policy, retention, or whether logs are operational diagnostics versus durable audit/game history.
+- Validation: define message storage type/limit, JSON size/schema, allowed streams/sources/marks, timestamp range, null-versus-empty data, and correction/deletion semantics.
+- Validation: confirm UI/client dependency on `human_time`, oldest-first API order, admin newest-first order, and current source strings.
+- Defects: broker log severity is lost; API search references nonexistent `level`; UUID required by routes is absent from representation.
+- Defects: auth mixin is shadowed and independently incompatible with DRF; API enables history forgery/mutation/deletion.
+- Defects: silent/dead `write_event()` changes timestamps/defaults; core owns the log DTO while streams only re-exports it.
+- Operations: no indexes, pagination, retention, partitioning, archival, payload limits, correlation fields, volume metrics, or redaction controls.
+- Evidence: generated schema confirms writable timestamp/content and missing UUID; fixture has zero stream rows and cannot characterize deployed data.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `StreamEvent` DTO | Own versioned event/log wire fields and complete header decoding | preserve source/level/save; add event/correlation/occurrence IDs compatibly |
+| `StreamTaxonomy` | Define stream, source, mark/severity rules | preserve `game`, `log`, and current level strings; controlled extensions |
+| `StreamAppendRepository` | Validate and append immutable records | database-generated recorded time/sequence, idempotency, no serializer coupling |
+| `OperationalLogAdapter` | Convert worker/context logs to append commands | same path for inline and broker logs; explicit best-effort/required policy |
+| `GameEventRecorder` | Record durable game/audit events | actor/correlation/causation and transaction/outbox policy |
+| `StreamQueryService` | Authorized indexed filtering and stable pagination | read-only UUID DTO, time ranges, cursor order, bounded payload |
+| `StreamRetentionService` | Archive/delete/redact according to policy | legal/audit exceptions, metrics, recoverability, actor trail |
+| `StreamAdminAdapter` | Investigate/export/correct without in-place history rewrite | correction/tombstone events, restricted roles, audit actor |
+| `InternalEffectOutbox` | Decouple required records/follow-ups from source ACK | retry, DLQ, poison isolation, observable status |
+
+## 8. Migration Order
+
+1. Characterize deployed stream values, UI queries, volume, sensitive data, severity/source strings, ordering ties, duplicates, and worker settlement behavior.
+2. Lock down stream API/admin; make API read-only for normal consumers and stop anonymous history access/mutation.
+3. Add UUID to read DTO, stable indexed pagination, valid search/filter fields, and explicit time-range/default order.
+4. Fix complete event-header decoding so broker and inline log paths preserve identical severity/source/save semantics.
+5. Introduce one validated append repository with recorded time, optional occurred time, ingestion sequence, event/correlation IDs, and typed outcomes.
+6. Define operational-log versus durable game/audit reliability; move required effects to transaction/outbox and make best-effort loss observable.
+7. Migrate taxonomy/null semantics, add indexes and payload limits, and preserve legacy records without rewriting evidence silently.
+8. Add retention, archival, redaction, export, reconciliation, volume/error metrics, and audited correction/tombstone workflows.
+9. Move DTO ownership into streams and remove legacy serializer-backed `write_event()`/re-export only after callers and compatibility are verified.
+
+## 9. Minimum Tests
+
+- Model/repository append preserves UUID, recorded timestamp, message, JSON/null, stream, source, and mark.
+- Inline `info`, `log`, and `error` context events persist exact severity/source/message/data.
+- Broker encode/decode/persist round trip preserves level header, source, message data, and `save` true/false.
+- Multiple same-second records return in deterministic cursor order without omission/duplication across pages.
+- API exposes read-only UUID, valid search over message/source/stream/mark or chosen fields, exact filters, ordering allowlist, and bounded pagination.
+- Anonymous, ordinary user, operator, and admin authorization for read, append, correction, deletion, export, and sensitive fields.
+- Public API cannot forge timestamp/source/severity or edit/delete history under target policy.
+- One invalid record in a batch, database outage, serialization failure, duplicate event ID, and transaction rollback produce explicit settlement/results.
+- Log insert succeeds but follow-up publish fails, and inverse failure ordering, both reconcile through chosen outbox/retry policy.
+- Worker publish failure, retry, DLQ, and poison event preserve source event without infinite loop.
+- Null versus empty message data and legacy arbitrary stream/source/mark values migrate according to explicit rules.
+- Timestamp lower/upper bounds, timezone rendering, date-boundary display, and `human_time` compatibility.
+- Payload size, sensitive-field redaction, retention expiry, archive restore, legal hold, and audited tombstone/correction.
+- Query plan/index tests for common timestamp/stream/source/mark filters at expected production volume.
+
+## 10. Do-Not-Lose
+
+- Existing random record UUIDs and their role as stable record identity, even though current API fails to expose them.
+- Raw epoch timestamp, full message, JSON message data, stream, source, and mark fields for legacy records.
+- Conventional stream names `game` and `log` and level/mark values `info`, `log`, and `error` where consumers depend on them.
+- Current context-derived source names and worker source naming until query/UI migration is verified.
+- `save=false` ability to suppress persistence, with explicit discard behavior rather than accidental fallthrough.
+- Chronological query capability and timezone-aware `human_time` compatibility where UI depends on `HH:MM:SS`.
+- Inline context log creation and worker-generated log ingestion, converging on one severity-preserving append path.
+- Log-before-follow-up ordering where proven semantically required; otherwise migrate with explicit effect policy.
+- Arbitrary legacy JSON payload readability while introducing versioned validation for new writes.
+- Required observability of persistence, retry, discard, retention, redaction, and mutation/correction outcomes.
+
+<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->

@@ -1,0 +1,277 @@
+# AGENT REFERENCE: ALERT
+
+Reviewed: 2026-08-24
+Scope: `server/alert` and direct dependencies
+Purpose: behavior map for preserving alert-state and alert-counter contracts during migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Treat `server/alert`, `server/event_contexts/alert`, and their runtime callers as authoritative; use tests, generated schema, fixtures, and docs as supporting evidence.
+3. Preserve confirmed alert contracts, not accidental failure behavior such as swallowed publishes, unconditional acknowledgements, or ineffective purge operations.
+4. Keep HTTP transport, event transport, transition policy, persistence, scheduling, and device-update side effects separate.
+5. Make alert transition serialization, counter ordering, publish success, retries, settlement, and idempotency explicit.
+6. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/core/scheduler/.agent-review` before changing their shared boundaries.
+
+## 1. Sources
+
+- Primary: `server/alert/models.py`, `server/alert/service.py`, `server/alert/serializers.py`, `server/alert/views.py`, `server/alert/urls.py`, `server/alert/admin.py`, and `server/alert/migrations/0001_initial.py`
+- Entrypoints: `/api/alert/alert_state/`, `/api/alert/alert_counter/`, Django admin saves, `python manage.py start_worker internal`, `python manage.py start_scheduler`, and `/ops/healthcheck/`
+- Event dependencies: `server/event_contexts/alert/events.py`, `server/event_contexts/alert/context.py`, `server/event_contexts/alert/tasks.py`, and `server/event_contexts/device/power_shield_context.py`
+- Runtime dependencies: `server/core/transport/{events,publish,config}.py`, `server/core/worker_queue_handlers/internal.py`, `server/core/scheduler/{service,tasks}.py`, `server/core/healthcheck.py`, `server/core/models/mqtt.py`, and `server/core/helpers.py`
+- Device/data consumers: `server/peripheral_devices/models/base.py`, `server/peripheral_devices/models/passive.py`, `server/peripheral_devices/service/passive_config.py`, `server/peripheral_behavior/models/{access,menu}.py`, and device client-update workers
+- Evidence: `server/tests/test_alert/test_event_types.py`, `schema.yml`, `skaben_data.json`, `docs/operating/alert_status.md`, and the area reviews under `server/core`
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `alert.models.AlertState` | Persist named alert configuration and current-state flag; publish state events from `save()` | API, admin, service, device models, access/menu configuration |
+| `alert.models.AlertCounter` | Persist append-style alert counter history; publish counter events from `save()` | API, service, scheduler, scale configuration |
+| `alert.service.AlertService` | Query states/counters, map counters to threshold ranges, and execute writes | HTTP views, alert contexts, scheduler, health checks, device config |
+| `alert.serializers` | Expose all model fields and create counter rows | DRF viewsets and generated OpenAPI schema |
+| `alert.views` | List/retrieve states and counters, create counters, set current state, fetch latest counter | HTTP clients and operator UI |
+| `event_contexts.alert.events` | Define Pydantic wire DTOs for internal alert events | models, scheduler, power-shield context, internal worker |
+| `event_contexts.alert.context.AlertEventContext` | Decode alert events and orchestrate DB changes, logs, and device refresh messages | `InternalHandler` |
+| `event_contexts.alert.tasks` | Build player-reaction and scheduled counter events | scheduler; no current source caller for `create_alert_reaction_event()` was found |
+| `core.worker_queue_handlers.internal.InternalHandler` | Route internal events through alert/device contexts, persist logs, republish follow-up events, settle messages | `worker_internal` process |
+| `core.scheduler` | Poll Redis, calculate auto changes, publish alert counter events | `scheduler` process |
+| `peripheral_devices.service.passive_config` | Render current alert state and counter into simple-device configuration | client-update path |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| HTTP state read/change | DRF router under `/api/alert/` | Synchronous ORM; state change relies on later RabbitMQ processing for counter reset and device refresh |
+| HTTP counter read/create | DRF router under `/api/alert/` | Synchronous counter insert; later internal event processing derives state/device effects |
+| Internal alert worker | `python manage.py start_worker internal`, queue `internal` | Single synchronous Kombu callback per process; DB writes plus follow-up publishes |
+| Scheduled auto-change | `python manage.py start_scheduler` | Single-threaded Redis polling; publishes `AlertCounterEvent` at state-controlled intervals |
+| Power-shield transition | device INFO event from topic `pwr` | Produces state event for `blue -> cyan` or `cyan -> first ingame state` |
+| Health/integrity read | `/ops/healthcheck/` or integrity command | Reads current state; creates initial counter when missing; reports state errors |
+
+## 3. Canonical Flows
+
+### Explicit state change through HTTP or admin
+
+```text
+POST alert_state/{id}/set_current/ or model admin save
+  -> AlertService.set_state_current()
+  -> AlertState.save(): deactivate other rows + persist selected row
+  -> AlertStateEvent(event_source="alert_state", counter_reset=true)
+  -> internal worker
+  -> set counter to selected state's threshold without another counter event
+  -> enqueue client_update.<topic>.all for every active device topic
+```
+
+The API calls the service with `init_by="alert_state"`. An already-current state is a no-op. The model deactivates other rows with `QuerySet.update()`, so those rows do not emit their own events. Counter reset occurs asynchronously after the HTTP response and only if the state event is delivered and handled.
+
+### External state event, including power-shield transition
+
+```text
+AlertStateEvent(event_source=<external>, state=<name>)
+  -> internal worker
+  -> AlertService.set_state_by_name()
+  -> AlertState.save(event_source=<external>)
+  -> secondary AlertStateEvent(event_source="alert_state", counter_reset=false)
+  -> internal worker
+  -> enqueue all active device configurations
+```
+
+When the external event actually changes state, the first handler returns after persistence. The model-generated secondary event suppresses counter reset and performs device fanout. If the external event names the already-current state, no secondary event is created; the original event continues and, because `counter_reset` defaults to `true`, resets the counter and fans out device updates.
+
+### Direct counter creation
+
+```text
+POST alert_counter/ or direct AlertCounter.save()
+  -> append AlertCounter row
+  -> AlertCounterEvent(event_source="alert_counter", change="set", comment="self-generated")
+  -> internal worker
+  -> derive threshold state
+  -> possibly persist current state
+  -> request scale (`scl`) refresh
+```
+
+Observed defect: if this self-generated counter event changes the state, the context references undefined local `old_state` after persisting the new state. The worker logs the exception and ACKs the message; scale refresh is skipped, and state-event publication is suppressed because the state write source is `alert_counter`.
+
+### External or scheduled counter change
+
+```text
+AlertCounterEvent(event_source=<external>, change=set|increase|decrease)
+  -> internal worker
+  -> compute absolute value and append AlertCounter row
+  -> secondary AlertCounterEvent(event_source="alert_counter", change="set")
+  -> derive and possibly persist threshold state
+  -> optional secondary AlertStateEvent(counter_reset=false)
+  -> later internal handling
+  -> scale-only and/or all-device refresh
+```
+
+`increase` and `decrease` read the latest row, calculate a new absolute value, and append a row. Model-generated counter events always carry `change="set"`, `event_source="alert_counter"`, and `comment="self-generated"`, regardless of the initiating event's source/comment.
+
+### Scheduled auto-change
+
+```text
+scheduler due alert task
+  -> create_alert_auto_event()
+  -> inspect current state + latest counter + threshold range
+  -> AlertCounterEvent(event_source="scheduled")
+  -> internal worker canonical external-counter flow
+  -> next run after current state's auto_timeout
+```
+
+No event is produced when `auto_level == 0` or `auto_timeout == 0`; fallback polling uses `settings.SCHEDULER_TASK_TIMEOUT` (10 seconds in current settings). Threshold crossing uses a hard-coded dampener of 30. Scheduler execution and global alert transitions have no leader lock or row lock.
+
+### Device configuration read
+
+```text
+client update request
+  -> current AlertState
+  -> smart device: alert field is current state database ID as string
+  -> `scl`: {level, state, borders}
+  -> other passive device: PassiveConfig(topic, state).config
+  -> MQTT CUP packet
+```
+
+Scale `borders` are evenly split between service values `min_alert_value=1` and the maximum ingame threshold; they are not the configured state thresholds themselves.
+
+## 4. Contracts
+
+### `AlertState`
+
+- Role: named global mode plus threshold and automatic-change configuration.
+- Input/state: unique `name` (32 chars), unique integer `order`, `info` (256 chars), `ingame`, integer `threshold`, `current`, `auto_change`, `auto_level`, `auto_timeout`, `counter_increase`, and `counter_decrease`.
+- Behavior: constructing an instance snapshots its original `current` value. Saving a false-to-true transition first bulk-clears `current` on every other row, persists this row, then may publish an event.
+- Output/effects: current state affects device configuration, lock permissions, terminal menus, power-shield rules, reaction deltas, and scheduler cadence.
+- Invariants: application code expects exactly one current row. Database enforces unique `name` and `order`, but does not enforce exactly/at-most one `current=true` row. `PassiveConfig.state` uses `PROTECT`, so referenced states cannot be deleted through that relationship.
+- Event-source rule: `save(event_source="alert_counter")` suppresses state-event publication. Any other source publishes only when the in-memory `current` value differs from the construction/load snapshot. Published event source is always `alert_state`; `counter_reset` is true only when save source was `alert_state`.
+- Edge cases: `clean()` rejects unsetting the last current row, but ordinary `save()` does not call `clean()`. QuerySet updates bypass both validation and events. Concurrent transitions can leave multiple current rows because clearing and saving are not transactional or locked.
+
+### `AlertCounter`
+
+- Role: history row containing absolute counter value, comment, and timestamp.
+- Input/state: signed integer `value`, comment up to 64 chars, client-writable timestamp with default `timezone.now`.
+- Behavior: each normal save persists first, then may publish a self-generated absolute-set event. `AlertService.set_alert_counter()` skips insertion when requested value equals latest value; the API serializer does not perform that no-op check.
+- Output/effects: latest row by primary-key ID drives state mapping, scheduler decisions, and scale configuration. Timestamp does not determine latest value.
+- Invariants: history is append-only by convention, not by database constraint. Negative and above-maximum values are accepted by model and API.
+- Event-source rule: `save(event_source="alert_state")` suppresses counter-event publication. Every other source publishes an event whose source is always `alert_counter`, change is `set`, and comment is `self-generated`.
+- Edge cases: `AlertCounterManager.get_latest()` does not catch `DoesNotExist`, and its fallback is unreachable; `create_initial()` passes unsupported `context="no_send"` into model save. Current callers instead use `AlertService.get_last_counter()`.
+
+### `AlertService`
+
+- Role: query and mutate alert persistence while encoding recursion-suppression source markers.
+- Input/state: snapshots ingame states ordered by `order` during construction, builds threshold ranges once, fixes `min_alert_value` at 1, and retains caller-provided `init_by`.
+- Behavior: ranges use configured thresholds as inclusive lower bounds and the next ingame threshold as exclusive upper bounds. Final range ends at `max_threshold + 1`. `set_state_by_last_counter()` clamps values at or above the maximum threshold; direct `get_state_by_alert()` does not clamp.
+- Output/effects: writes model rows, whose `save()` methods perform broker side effects.
+- Invariants: `get_state_current()` requires exactly one current row through `.filter(current=True).get()`. Zero rows become `ConfigException`; multiple rows raise `AlertState.MultipleObjectsReturned`.
+- Edge cases: unknown state names return `None` from lookup; `set_state_by_name()` silently does nothing for them. Negative counter values map to no state. Gaps, overlaps, duplicate thresholds, and mismatch between `order` and threshold order are not validated. Service context-manager exit does no cleanup.
+
+### Internal event wire format
+
+- `AlertStateEvent` headers: `{"event_type": "alert_state", "event_source": <string>}`.
+- `AlertStateEvent` body: `{"state": <string>, "counter_reset": <bool>}`; `counter_reset` defaults to `true`.
+- `AlertCounterEvent` headers: `{"event_type": "alert_counter", "event_source": <string>}`.
+- `AlertCounterEvent` body: `{"value": <int>, "change": "increase"|"decrease"|"set", "comment": <string|null>}`.
+- Events publish with routing key `internal`. Device refresh messages use `client_update.<topic>.all`; counter-only refresh targets topic `scl`.
+- Decoding combines selected headers with body and validates through Pydantic. Unknown event types pass through the alert context unchanged.
+
+### HTTP API
+
+- `GET /api/alert/alert_state/`: list all states; optional `?current=<bool>` filter.
+- `GET /api/alert/alert_state/{id}/`: retrieve one state.
+- `POST /api/alert/alert_state/{id}/set_current/`: empty request body; 200 with full state serialization, 404 for missing ID, 422 for any other raised exception.
+- `GET /api/alert/alert_counter/`: list history with no explicit ordering or pagination in this app.
+- `POST /api/alert/alert_counter/`: create a row and return 201; accepts value, comment, and timestamp according to serializer/schema.
+- `GET /api/alert/alert_counter/{id}/`: retrieve one row.
+- `GET /api/alert/alert_counter/get_latest/`: ensure a counter exists using current-state threshold as fallback, then serialize `objects.last()`.
+- `GET /api/alert/alert_counter/purge_history/`: generated route exists, but implementation neither deletes nor returns a response.
+- All serializers use `fields="__all__"`; state writes are exposed only through the custom empty serializer/action because no update mixins are registered.
+- OpenAPI does not require counter `value`, but serializer `create()` reads a missing value as `None` and explicitly passes it to the non-null model field instead of using model default 0.
+- Observed access policy: project DRF config supplies token authentication but no default authenticated permission, so default `AllowAny` applies. `AlertCounterViewSet` has no auth mixin. `AlertStateViewSet` places `DynamicAuthMixin` after `GenericViewSet`, so DRF's inherited hooks win; the mixin is ineffective. Installed auth middleware currently passes every request through.
+
+### Scheduled/reaction policy
+
+- `create_alert_reaction_event()` selects the current state's configured increase/decrease delta and raises `ValueError` when the chosen delta is zero. No source-code caller was found during this review.
+- Auto-change requires nonzero `auto_level` and `auto_timeout`, and `auto_change` equal to `increase` or `decrease`.
+- Increase crossing may cap an event at the next threshold plus 30; decrease crossing may floor it at the current threshold minus 30. A non-ingame adjacent state changes those limits.
+- Missing next/previous states are not handled before attribute access. A final increasing state or first decreasing state can therefore crash task calculation.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| No current state | `ConfigException`; health check records error because it catches the wrong exception type and does not select a fallback | Fail startup/health explicitly or perform a separately authorized bootstrap repair |
+| Multiple current states | `.get()` raises `MultipleObjectsReturned` | Database constraint plus serialized transactional transition |
+| Unknown state event | May log a successful switch even though `set_state_by_name()` did nothing; later effects depend on branch | Reject as validation/domain error; do not record false success |
+| Negative/out-of-range counter | No state match; self-generated path can call `set_state_current(None)` | Define clamp, reject, or retained-state policy before persistence |
+| Counter POST omits `value` | Schema permits it; serializer attempts to persist `None`, causing a database error | Require value or apply the documented model default before persistence |
+| Direct counter causes state transition | State may persist, then undefined `old_state` raises; worker ACKs and skips refresh | Atomic transition with deterministic follow-up effects or retry |
+| `purge_history` called | QuerySet is constructed but not deleted; view returns `None`, causing DRF error | Remove route or implement authorized, bounded deletion with response |
+| DB write succeeds, publish fails | Publisher logs and swallows error; caller reports success | Transactional outbox or explicit publish failure with retryable status |
+| Alert event handler raises | `InternalHandler` logs and ACKs message | Reject/requeue by typed policy; poison messages to DLQ after bounded attempts |
+| Scheduler alert calculation raises | Generic command handler reports error and scheduler process exits | Isolate task failure, surface unhealthy state, retry with bounded backoff |
+| Concurrent counter increments | Both readers can use same latest value and append lost-update results | Lock/version aggregate or atomic serialized command handling |
+| Concurrent state transitions | Clear-and-save sequences can interleave and violate single-current assumption | Transaction plus row/advisory lock and DB uniqueness constraint |
+| Counter/state write repeated | New history/events may duplicate; no idempotency key exists | Command/event identity with deduplication and idempotent effects |
+| Event published before outer DB commit | Worker may observe uncommitted/missing state; rollback can leave emitted event | Publish after commit through outbox |
+| Fresh publisher has empty exchange map | `None` exchange is passed; delivery depends on accidental default-exchange behavior, and result is unobservable | Initialize explicit exchange and confirm routability/publisher confirms |
+
+- Concurrency/order: alert transitions have no locks, transactions, optimistic versions, broker partition key, or consumer-side serialization across multiple worker processes. Counter ordering is inferred from auto-increment ID, not event time. Device updates may trail, duplicate, or be absent relative to state persistence.
+- Reliability: no outbox, idempotency key, retry count, delayed retry, DLQ, or partial-effect record exists. Model saves couple persistence to synchronous publishing, while publish exceptions are swallowed. Internal worker catches every handler exception and ACKs.
+- Security/operations: alert read and mutation endpoints are effectively public at application permission level. Counter history is unbounded; list/purge operations lack explicit pagination/retention policy. No graceful alert-transition drain exists during worker shutdown.
+
+## 6. Gaps
+
+- Tests: only four tests cover Pydantic event construction/encoding and invalid/missing fields. No model, service, threshold, API, context, scheduler, broker-failure, current-state invariant, or concurrency tests exist.
+- Docs: `docs/operating/alert_status.md` describes standard color meanings but leaves transition logic as TODO. It says blue/cyan are non-automatic, consistent with fixture `ingame=false`, but does not describe source markers, counter reset rules, range boundaries, failure behavior, or device fanout.
+- Schema: generated OpenAPI advertises `purge_history` as successful GET and `set_current` without its actual response schema. It exposes timestamp as writable and does not communicate asynchronous side effects.
+- Validation: no proof exists for desired behavior with negative values, values above maximum, threshold gaps/duplicates, order/threshold disagreement, no/duplicate current rows, or missing passive configs. `auto_change` is a string choice field but has boolean `False` as its model default; records created without an explicit choice can become invalid scheduler configuration.
+- Defects: undefined `old_state`, possible `set_state_current(None)`, omitted counter values becoming `None`, ineffective purge route, broken unused counter manager fallback, incorrect health-check exception handling, ineffective auth mixin, invalid `auto_change` default, silent unknown-state no-op, and unchecked scheduler neighbors.
+- Evidence drift: `skaben_data.json` contains runtime counter history as well as configuration and is currently modified in the worktree; treat its values as supporting examples, not immutable contracts. Current standard fixture has non-ingame `white`, `blue`, `cyan`, `black`; ingame `green` threshold 1, `yellow` 500, `red` 1000; `green` is current.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `AlertStateRepository` | Load configuration/current state and atomically persist one current state | Enforce one current state; preserve IDs/names/order and related FK/M2M compatibility |
+| `AlertCounterRepository` | Append/read ordered counter history and enforce retention | Atomic ordering; explicit timestamp semantics; no broker calls |
+| `AlertTransitionService` | Validate commands, calculate thresholds, and return transition/effect plan | Serialized global commands; explicit negative/max/non-ingame policy |
+| `AlertEventOutbox` | Persist state/counter events with transition transaction | Stable wire schema, idempotency key, after-commit delivery |
+| `AlertEventConsumer` | Validate event, invoke domain service, and settle message | ACK only after required effects; bounded retry and DLQ |
+| `AlertDeviceUpdateGateway` | Fan out all-topic or scale-only configuration refresh | Explicit exchange/routing, observable partial failure, idempotent requests |
+| `AlertSchedulerPolicy` | Calculate next command and interval | Pure calculation; handle terminal neighbors and bad config without process death |
+| `AlertAPI` | Authenticate/authorize reads and commands; report sync/async outcome | Preserve route compatibility until clients migrate; no hidden model-save effects |
+
+## 8. Migration Order
+
+1. Characterize direct state changes, external state events, direct/external counter changes, scheduled changes, and every failure/settlement path.
+2. Make database success, event enqueue success, and device-update success independently observable.
+3. Define retry, discard, dead-letter, idempotency, and counter range policies.
+4. Extract alert repositories and a pure transition/scheduler policy from Django models and event contexts.
+5. Add a transaction/outbox boundary, single-current database constraint, and serialized counter/state concurrency control.
+6. Move HTTP, worker, scheduler, and device fanout onto explicit adapters while preserving temporary route/wire compatibility.
+7. Remove model `save()` publishing, source-string recursion suppression, duplicate event loops, and legacy failure behavior after compatibility verification.
+
+## 9. Minimum Tests
+
+- Direct state change: one current row, expected counter reset, one all-device fanout, stable response/event schema.
+- External state transition: no unintended counter reset; already-current event behavior explicitly characterized.
+- Counter set/increase/decrease: append order, equal-value behavior, threshold transition, scale/all-device fanout.
+- Threshold boundaries: exact lower bound, next-boundary exclusivity, negative value, maximum, above maximum, gaps, duplicate thresholds, and order mismatch.
+- Validation failure: missing/unknown state, invalid event change, no/multiple current rows, invalid auto-change config.
+- Dependency failure: DB failure, event publish failure, device-fanout failure, and failure after partial effects.
+- Retry/settlement: successful ACK, transient requeue, bounded poison-event DLQ, duplicate delivery idempotency.
+- Ordering/concurrency: simultaneous increments and simultaneous state transitions across workers.
+- Scheduler: disabled auto-change, normal increase/decrease, boundary dampener, missing next/previous state, multiple schedulers.
+- HTTP: permissions, list/retrieve/create, `set_current` statuses/body, latest initialization, and removal or corrected implementation of purge.
+- Wire/schema compatibility: exact event headers/body, API routes/fields, routing keys, state IDs/names, and counter comments/timestamps.
+
+## 10. Do-Not-Lose
+
+- HTTP route names and current response fields until callers migrate: `alert_state`, `alert_counter`, `set_current`, and `get_latest`.
+- Internal event names and shapes: `alert_state`, `alert_counter`, source header, state/counter payloads, and `increase|decrease|set` operations.
+- Device routing formats: `internal` events and `client_update.<topic>.all`, including scale topic `scl`.
+- Stable alert state names/IDs/order and existing `PassiveConfig`, access-permission, and terminal-menu relationships.
+- Lower-bound-inclusive threshold semantics and explicit current-state behavior, after edge cases are characterized and approved.
+- Counter history value/comment/timestamp compatibility and latest-by-insertion ordering where clients depend on it.
+- Distinction between manual state changes that reset counter and counter-driven/external transitions that suppress recursive reset.
+- Required downstream effects: refresh all device configs after state transition; refresh scale data after counter-only change; retain operational transition logs.
+
+<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->

@@ -1,0 +1,453 @@
+# AGENT REFERENCE: LEGACY WORKER QUEUES
+
+Reviewed: 2026-08-24
+Scope: `server/core/worker_queue_handlers` and direct dependencies
+Purpose: behavior map for migration into the modern Django template
+
+## 0. Agent Rules
+
+1. Read `server/core/.agent-review` first.
+2. Read this file before changing worker, transport, alert, or device code.
+3. Treat `server/core/worker_queue_handlers` as the source of current worker
+   behavior.
+4. Preserve behavior intentionally; do not copy accidental failure behavior.
+5. Keep transport, domain decisions, persistence, and side effects separate in
+   new code.
+6. Do not rely on Django model `save()` side effects in migrated code.
+7. Do not acknowledge a message until all required effects have succeeded.
+8. Preserve per-device ordering and serialize global alert transitions.
+
+## 1. Files to Read
+
+Primary:
+
+- `server/core/worker_queue_handlers/base.py`
+- `server/core/worker_queue_handlers/ask_mqtt_handler.py`
+- `server/core/worker_queue_handlers/internal.py`
+- `server/core/worker_queue_handlers/state_update.py`
+- `server/core/worker_queue_handlers/client_update.py`
+- `server/core/management/commands/start_worker.py`
+
+Transport:
+
+- `server/core/transport/config.py`
+- `server/core/transport/publish.py`
+- `server/core/transport/packets.py`
+- `server/core/transport/events.py`
+
+Transitive behavior:
+
+- `server/event_contexts/alert/context.py`
+- `server/event_contexts/device/context.py`
+- `server/event_contexts/device/lock_access_context.py`
+- `server/event_contexts/device/power_shield_context.py`
+- `server/alert/models.py`
+- `server/alert/service.py`
+- `server/peripheral_devices/models/base.py`
+- `server/peripheral_devices/models/lock.py`
+- `server/peripheral_devices/models/terminal.py`
+- `server/peripheral_devices/service/passive_config.py`
+- `server/peripheral_devices/service/packet_format.py`
+
+## 2. Current Process and Queue Topology
+
+| Process | Command | Handler | Consumed queue |
+| --- | --- | --- | --- |
+| `worker_mqtt` | `start_worker mqtt` | `AskHandler` | `ask` |
+| `worker_internal` | `start_worker internal` | `InternalHandler` | `internal` |
+| `worker_save` | `start_worker state` | `StateUpdateHandler` | `state_update` |
+| `worker_send` | `start_worker client` | `ClientUpdateHandler` | `client_update` |
+| `scheduler` | `start_scheduler` | separate scheduler | none |
+
+Queue bindings:
+
+| Queue | Exchange | Binding |
+| --- | --- | --- |
+| `ask` | `mqtt` | `ask.#` |
+| `internal` | `internal` | `internal.#` |
+| `state_update` | `internal` | `state_update.#` |
+| `client_update` | `internal` | `client_update.#` |
+
+All queues are durable. Each process initializes all exchanges and queues.
+
+## 3. Canonical Message Flows
+
+### 3.1 Device ingress
+
+```text
+MQTT ask.<type>.<uid>.<packet>
+  -> AskHandler
+  -> internal.<type>.<uid>.<packet>
+  -> InternalHandler
+```
+
+### 3.2 SUP: device state to database
+
+```text
+ask.<type>.<uid>.sup
+  -> AskHandler: parse + keepalive
+  -> internal.<type>.<uid>.sup
+  -> InternalHandler: extract body.datahold
+  -> state_update.<type>.<uid>
+  -> StateUpdateHandler: validate + QuerySet.update()
+```
+
+### 3.3 CUP: database configuration to device
+
+```text
+ask.<type>.<uid>.cup OR server-generated client update
+  -> client_update.<type>.<uid-or-all>
+  -> ClientUpdateHandler: load + serialize configuration
+  -> MQTT <type>.<uid>.cup
+```
+
+### 3.4 INFO: player/device event
+
+```text
+ask.<type>.<uid>.info
+  -> AskHandler
+  -> InternalHandler
+  -> SkabenDeviceEvent
+  -> AlertEventContext and DeviceEventContext
+  -> DB writes, logs, follow-up events, and/or client updates
+```
+
+### 3.5 Internal domain event
+
+```text
+internal message with headers.event_type
+  -> InternalHandler
+  -> alert context + device context
+  -> StreamRecord rows OR republished internal events
+```
+
+## 4. Shared Handler Runtime
+
+Class: `BaseHandler`
+Runtime: synchronous Kombu `ConsumerProducerMixin`
+
+Direct behavior:
+
+- Owns one consumed queue and one synchronous callback.
+- Accepts JSON only.
+- Creates a RabbitMQ connection and Redis client per process.
+- `dispatch()` publishes to `internal` or `mqtt` using dot-separated routing.
+- `send_log()` publishes a `SkabenLogEvent` to `internal`.
+- Redis lock methods exist but no concrete handler calls them.
+
+Missing controls:
+
+- No explicit prefetch/QoS.
+- No bounded concurrency.
+- No retry count or delayed retry.
+- No dead-letter queue.
+- No idempotency/deduplication.
+- No poison-message quarantine.
+
+Critical publish behavior:
+
+`core.transport.publish.publish()` catches all exceptions and does not re-raise
+or return failure. A caller usually acknowledges its source message even when
+the required publish failed.
+
+## 5. Worker Contracts
+
+### 5.1 AskHandler
+
+Role: MQTT ingress, packet normalization, keepalive persistence, routing.
+
+Input contract:
+
+- Queue: `ask`
+- Routing: `ask.<device_type>.<device_uid>.<packet_type>`
+- Body: JSON string or dict
+
+Actions:
+
+1. Require at least four routing segments.
+2. Requeue when the first segment is not `ask`.
+3. Parse JSON.
+4. Read/update `core.DeviceKeepalive`.
+5. Normalize nested `datahold` for INFO, CUP, and SUP.
+6. If device is considered offline, emit an empty CUP request to `internal`.
+7. Otherwise emit the packet to `internal` unchanged by packet type.
+8. Acknowledge after the publish call returns.
+
+Database effects:
+
+- Read `DeviceKeepalive` by MAC.
+- Update existing timestamp with device-supplied timestamp.
+- Create missing keepalive with server timestamp.
+
+Important exact behavior:
+
+- Online/offline is calculated from the previously stored timestamp before the
+  incoming timestamp is saved.
+- A new device is treated as offline for its first message.
+- `device_uid == "all"` skips persistence and is treated as online.
+- Unknown packet types are forwarded to `InternalHandler`.
+- Routing keys longer than four segments are accepted; extra segments ignored.
+
+Defects/risks:
+
+- Publish failure is swallowed; source is still acknowledged.
+- Missing delivery metadata can raise outside the caught `ValueError` path.
+- `get_simple_keepalive()` is unused and references missing setting
+  `KEEPALIVE_INTERVAL`.
+
+### 5.2 InternalHandler
+
+Role: packet router plus primary game/domain event orchestrator.
+
+Input contract:
+
+- Queue: `internal`
+- Packet routing: `internal.<device_type>.<device_uid>.<packet_type>`
+- Event marker: `message.headers["event_type"]`
+
+Packet routing:
+
+| Packet | Action | Output |
+| --- | --- | --- |
+| `SUP` | extract `body["datahold"]` | `state_update.<type>.<uid>` |
+| `CUP` | forward full body | `client_update.<type>.<uid>` |
+| `INFO` | create `SkabenDeviceEvent` and process inline | context effects |
+| `PONG` | no branch exists | reject |
+| other | no branch exists | reject |
+
+Event processing:
+
+1. A `log` event with `save=true` becomes a `StreamRecord` directly.
+2. Other events are offered to `AlertEventContext`.
+3. The same events are then offered to `DeviceEventContext`.
+4. Generated log events are bulk-inserted as `StreamRecord` rows.
+5. Generated non-log events are republished to `internal`.
+
+Transitive alert effects:
+
+- Read/create alert counter history.
+- Change current alert state.
+- Enqueue all active topics for client update after alert-state changes.
+- Enqueue `scl` client update after relevant counter changes.
+- Persist transition logs.
+- `AlertCounter.save()` and `AlertState.save()` can publish more alert events.
+
+Transitive device effects:
+
+- `lock` INFO: look up lock/access code; log access result.
+- Unknown access code in `white` state: create default user/access code.
+- Unknown lock in `white` state: create lock.
+- `pwr` INFO: emit alert-state transition for AUX/ON conditions.
+- Other device types: no device context; event usually becomes a no-op.
+
+Acknowledgement behavior:
+
+- Top-level callback catches every exception, logs it, then acknowledges the
+  message if nested code did not already settle it.
+- Malformed payloads and transient DB failures can therefore be lost.
+
+Defects/risks:
+
+- Domain logic, persistence, transport, and logging are coupled.
+- No transaction/outbox across DB writes and follow-up publishes.
+- Model `save()` events can recursively re-enter this handler.
+- Follow-up publish failure is swallowed before source acknowledgement.
+- A malformed SUP missing `body.datahold` is logged and then acknowledged.
+- Comment says logs use a stream queue; implementation writes PostgreSQL.
+
+### 5.3 StateUpdateHandler
+
+Role: validate and persist smart-device state received through SUP.
+
+Input contract:
+
+- Queue: `state_update`
+- Routing: exactly `state_update.<device_topic>.<device_uid>`
+- Body: SUP `datahold`
+
+Actions:
+
+1. Require exactly three routing segments.
+2. Require topic configured as DB type `smart`.
+3. Map `lock` or `terminal` to a Django model.
+4. Call model `from_mqtt_config(body)`.
+5. Persist with `QuerySet.update()`.
+6. Acknowledge.
+
+Supported behavior:
+
+- `lock`: parses optional `closed` and `blocked` values.
+- `terminal`: mapped as smart, but has no `from_mqtt_config()` implementation.
+
+Important exact behavior:
+
+- `QuerySet.update()` bypasses model `save()` and avoids MQTT echo. Preserve
+  this as an explicit repository behavior.
+- Topic type filtering does not require `active=true`.
+- Missing device row returns update count 0 and is acknowledged silently.
+
+Defects/risks:
+
+- Terminal SUP raises `AttributeError`.
+- `except model.DoesNotExist` is ineffective because `QuerySet.update()` does
+  not raise that exception.
+- Validation, mapping, DB, and terminal parser errors have no explicit message
+  settlement policy.
+- No row lock, version/hash check, audit record, or idempotency.
+
+### 5.4 ClientUpdateHandler
+
+Role: load server configuration, serialize CUP, publish to MQTT.
+
+Input contract:
+
+- Queue: `client_update`
+- Routing: `client_update.<device_topic>[.<device_uid>]`
+- UID may be absent, specific, or `all`.
+
+Topic behavior:
+
+| Topic category | Reads | Output |
+| --- | --- | --- |
+| inactive | active topic list | acknowledge/no-op |
+| unknown | permitted topic list | reject |
+| simple except `scl` | current alert + `PassiveConfig` | one MQTT CUP |
+| `scl` | current alert + counter + threshold borders | one MQTT CUP |
+| smart specific | device + hash + related config | zero/one MQTT CUP |
+| smart `all` | all non-overridden devices | one MQTT CUP per device |
+
+Smart-device behavior:
+
+- Skip devices under override.
+- Unless `force_update`, send only when client hash differs from DB hash.
+- Missing lock can be created only in `white` state and emits a log.
+- Missing terminal is not created.
+- Lock config includes alert, override, lock fields, and access permissions.
+- Terminal hash reads account/menu relations, but terminal payload only contains
+  inherited base fields `alert` and `override`.
+
+Defects/risks:
+
+- Broadcast performs sequential DB work and synchronous MQTT publishes.
+- Publish failures are swallowed; source is acknowledged.
+- Packet builder may return `None`, then `send_mqtt(None)` fails.
+- Matching hash or override returns `None`, but caller wraps it in `[None]` and
+  tries to serialize it. Normal no-op can become rejection/error logging.
+- `message.headers` is assumed non-null for `force_update`.
+- Missing-lock creation invokes model `save()` transport side effects and then
+  the handler attempts its own CUP delivery.
+
+## 6. Side-Effect Ownership Matrix
+
+| Effect | Ask | Internal | State | Client |
+| --- | ---: | ---: | ---: | ---: |
+| Parse routing/body | yes | yes | yes | yes |
+| Keepalive DB write | yes | no | no | no |
+| Alert DB write | no | yes | no | read |
+| Device DB write | no | create | update | create lock |
+| Access-control DB write | no | yes | no | indirect |
+| Stream/log DB write | no | yes | no | via internal log |
+| Publish internal message | yes | yes | no | error log |
+| Publish MQTT packet | no | indirect | no | yes |
+| Domain decision | reconnect | primary owner | no | config selection |
+
+## 7. Current Failure Outcomes
+
+| Failure | Current settlement |
+| --- | --- |
+| Bad routing shape | usually reject, no requeue |
+| Wrong queue prefix | requeue |
+| Ask JSON/keepalive failure | reject |
+| Ask republish failure | log internally; acknowledge source |
+| Internal unexpected failure | log; acknowledge source |
+| Internal follow-up publish failure | log internally; acknowledge source |
+| State missing row | acknowledge after zero-row update |
+| State parser/DB failure | unspecified by handler |
+| Client inactive topic | acknowledge/no-op |
+| Client unknown topic | reject |
+| Client config exception | attempt internal error log; reject |
+| Client MQTT publish failure | log internally; acknowledge source |
+
+Migration requirement: replace this implicit matrix with named outcomes such as
+`success`, `discard`, `retry`, and `dead_letter`.
+
+## 8. Known Documentation/Test Gaps
+
+- Worker tests only mock and test `BaseHandler.dispatch()`.
+- No concrete worker route, DB effect, publish, ack, or failure path is tested.
+- Docs call the scheduler async; implementation uses synchronous `while` and
+  `time.sleep()`.
+- Docs imply packet marks are removed before internal routing; code retains the
+  packet type until `InternalHandler` terminates or redirects it.
+- Docs say SUP may trigger INFO behavior; current state worker only updates DB.
+- Docs describe PONG handling, but `InternalHandler` rejects PONG after ingress.
+
+## 9. Target: One Python Async Worker
+
+Use one supervised process, but keep four logical lanes:
+
+| Lane | Responsibility | Concurrency/order |
+| --- | --- | --- |
+| ingress | decode, keepalive, normalize | high priority; serial per device |
+| domain | INFO/events, alert/device decisions | global alert serial; per-device serial |
+| persistence | validate SUP, direct DB update | bounded; serial per device |
+| delivery | build config, MQTT CUP | bounded; broadcast cannot block ingress |
+
+Do not convert each legacy class directly into a large async callback.
+
+Target components:
+
+```text
+worker supervisor
+  transport.rabbitmq consumer/publisher
+  transport message DTOs and routing
+  services.ingress
+  services.alert_state_machine
+  services.device_events
+  services.device_configuration
+  repositories.keepalive
+  repositories.alert
+  repositories.device_state
+  repositories.stream
+  message outcome/retry/idempotency policy
+```
+
+## 10. Migration Order
+
+1. Add characterization tests for every flow in section 3.
+2. Make publish success/failure observable.
+3. Define explicit ack/retry/dead-letter outcomes.
+4. Extract model reads/writes into repositories.
+5. Remove MQ publishing from model `save()` paths.
+6. Extract alert/device decisions into services/state machines.
+7. Run the legacy queues through new handlers without changing routing keys.
+8. Introduce one async supervisor with bounded logical lanes.
+9. Only then decide whether `state_update` and `client_update` remain durable
+   RabbitMQ queues or become in-process commands.
+
+## 11. Minimum Characterization Tests
+
+- Ask: valid INFO/SUP/CUP/PONG routing.
+- Ask: new, online, stale, and `all` keepalive cases.
+- Ask: malformed JSON/routing and failed republish.
+- Internal: SUP, CUP, INFO, PONG, unknown packet.
+- Internal: log event save true/false.
+- Internal: alert counter/state transitions and follow-up messages.
+- Internal: lock known/unknown and access code known/unknown.
+- Internal: power AUX/ON/OFF transitions.
+- State: lock update, missing lock, inactive topic, terminal SUP, bad body.
+- Client: simple config, `scl`, smart specific/all, inactive/unknown topic.
+- Client: override, equal hash, forced update, missing lock/terminal.
+- Every worker: publish failure, DB failure, exact message settlement.
+
+## 12. Do-Not-Lose Behavioral Boundaries
+
+- First packet from a new/stale device requests CUP instead of continuing.
+- Incoming SUP persistence must not automatically echo configuration to MQTT.
+- Alert transitions fan out client updates to active device topics.
+- Scale updates include counter, state, and three computed borders.
+- Lock config includes ACL state mappings.
+- Unknown locks/access cards may be registered only in `white` state.
+- Power-shield events control transitions out of blue/cyan pre-game states.
+- Global alert transitions must not race.
+- Per-device SUP/CUP/INFO ordering must not race.

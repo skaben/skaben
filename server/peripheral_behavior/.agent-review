@@ -1,0 +1,350 @@
+# AGENT REFERENCE: PERIPHERAL BEHAVIOR
+
+Reviewed: 2026-08-24
+Scope: `server/peripheral_behavior` and direct dependencies
+Purpose: behavior map for preserving access-control and terminal-menu contracts during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Read `server/assets/.agent-review`, `server/alert/.agent-review`, `server/event_contexts/.agent-review`, and the relevant `server/core` reviews before changing this area.
+3. Treat code and database constraints as authoritative; use migrations, serializers, admin forms, fixtures, tests, and docs as supporting evidence.
+4. Preserve confirmed lock ACL, terminal projection, polymorphic discriminator, and content-shape contracts, not broken nested writes, unstable hashes, public mutation, or accidental cascades.
+5. Keep transport/API adapters, access policy, menu composition, persistence, secrets, device projection, and refresh side effects separate.
+6. Make ordering, uniqueness, concurrency, cache invalidation, retries, destructive cascades, and authorization explicit.
+
+## 1. Sources
+
+- Primary: `server/peripheral_behavior/models/{access,menu}.py`, `server/peripheral_behavior/serializers/menu.py`, `server/peripheral_behavior/{views,urls,admin}.py`, and `server/peripheral_behavior/migrations/0001_initial.py`
+- Entrypoints: `/api/behavior/menu/`, `/api/behavior/menu/{uuid}/`, `/api/behavior/account/`, `/api/behavior/account/{uuid}/`, custom Django admin, lock INFO processing, lock device configuration, and terminal API serialization
+- Access dependencies: `server/event_contexts/device/lock_access_context.py`, `server/peripheral_devices/models/lock.py`, `server/peripheral_devices/admin.py`, and `server/admin_extended/forms.py`
+- Terminal dependencies: `server/peripheral_devices/models/terminal.py`, `server/peripheral_devices/serializers/api.py`, and `server/peripheral_devices/admin.py`
+- Content and hash dependencies: `server/assets/{models,serializers}.py`, `server/core/models/base.py`, and `server/core/helpers.py`
+- Routing/security dependencies: `server/core/urls.py`, `server/core/middleware/auth_middleware.py`, and `server/settings.py`
+- Evidence: `skaben_data.json`; no package-specific source tests or behavior documentation were found
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `models.access.SkabenUser` | Game identity shared by access codes and terminal accounts | admin import, healthcheck, lock bootstrap, account model |
+| `models.access.AccessCode` | Globally unique card/code assigned to one game user | lock access context, `Permission`, admin import |
+| `models.access.Permission` | Allow one card on one lock for selected alert states | lock model configuration and hash, lock admin inline |
+| `models.menu.MenuItem` | Polymorphic UUID menu-item base with label, timer, operator comment, and content-derived hash | terminal accounts, behavior API, admin |
+| `MenuItemAudio/Video/Image/Text` | Bind one menu item to one typed asset | polymorphic serializer and admin |
+| `MenuItemUserInput` | Bind a menu item to a command/expected-input asset and player-facing prompt text | polymorphic serializer and admin |
+| `TerminalAccount` | Player account, plaintext game password, header/footer, and menu-item set | behavior API, terminal projection, admin |
+| `TerminalMenuSet` | Assign an account to a terminal for selected alert states | terminal model/API and terminal admin inline |
+| `serializers.menu` | Produce polymorphic menu/account representations | behavior viewsets and terminal API |
+| `views` / `urls` | Expose unrestricted model viewsets for menu items and accounts | project API router |
+| `admin` | Manage users, codes, accounts, and polymorphic menu items | custom `base_site`; device-owned inlines live in `peripheral_devices.admin` |
+| `models.__init__` | Re-export behavior models and an externally owned `PassiveConfig` | imports across server apps |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| Lock ACL projection | `Permission(card, lock, state_id)` | lock config map `{code: [alert_state_ids]}` and lock hash |
+| Unknown-code bootstrap | lock INFO packet with unknown code | optional default user and code creation; no permission grant |
+| Menu composition | admin/API menu item plus typed asset | polymorphic item attached to zero or more accounts |
+| Terminal assignment | `TerminalMenuSet(account, terminal, state_id)` | nested terminal accounts plus account-to-state map |
+| Behavior CRUD | unauthenticated REST request | direct model create/read/update/delete, subject to serializer defects and cascades |
+| Device-admin inline edit | Permission or TerminalMenuSet formset | child save followed by parent device save and update side effect |
+
+## 3. Canonical Flows
+
+### Lock access-control projection
+
+```text
+SkabenUser -> AccessCode -> Permission(lock, alert states)
+  -> LockDevice.permissions
+  -> {<access code>: [<alert-state primary keys>]}
+  -> lock hash/config API/MQTT configuration
+```
+
+`Permission` is unique for `(card, lock)`. Its state relation may be empty and has no explicit ordering. The lock projects database primary keys, not alert-state names. Editing the inline under a lock saves the permission formset and then re-saves the lock, which triggers the device-update path. Direct model changes do not have that parent-save guarantee.
+
+### Lock INFO and unknown-code bootstrap
+
+```text
+lock INFO {access_code, success}
+  -> exact AccessCode lookup
+  -> known code: record device-reported result
+  -> unknown code in white state and length == ACCESS_CODE_CARD_LEN (6)
+       -> get/create skaben_default user
+       -> create globally unique AccessCode
+       -> no Permission rows
+```
+
+The model accepts any nonempty string up to 16 characters and does not enforce numeric input. Runtime bootstrap is narrower: exactly six characters. This context records the device's `success` value; it does not recompute authorization from `Permission` server-side.
+
+### Terminal menu projection
+
+```text
+typed Asset -> polymorphic MenuItem
+  -> TerminalAccount.menu_items
+  -> TerminalMenuSet(account, terminal, alert states)
+  -> TerminalDevice.get_related_accounts()
+  -> Terminal API: accounts[] + account_state_map
+```
+
+Menu membership and terminal assignments have no explicit display order. More than one `TerminalMenuSet` may link the same terminal/account pair. The account list can then contain duplicates, while `account_state_map` collapses them by account UUID and whichever duplicate is processed last wins.
+
+### Menu/account hashing
+
+```text
+asset hash + menu label/timer (+ user-input prompt fields)
+  -> menu-item MD5
+password/header/footer + menu-item hashes in queryset order
+  -> terminal-account MD5
+account hashes in terminal queryset order + terminal flags
+  -> terminal hash
+  -> client-update comparison
+```
+
+The hash helper JSON-serializes inputs and computes MD5, so list ordering changes the result. No model ordering stabilizes either menu membership or account assignment. Menu UUID/type/comment are excluded. User-input action, expected value, and delay are excluded because its asset has no `hash`. Terminal assignment alert states are not part of the account hash and are not explicitly included in the observed terminal hash, so state-map-only edits can be missed by update comparison.
+
+### Behavior API read
+
+```text
+GET /api/behavior/menu/
+  -> polymorphic serializer
+  -> resourcetype=<Python child class name>
+     + timer + label
+     + nested typed content, except user input
+
+GET /api/behavior/account/
+  -> uuid + user id + plaintext password + header/footer
+     + read-only polymorphic menu_items[]
+```
+
+The discriminator values are `MenuItemAudio`, `MenuItemVideo`, `MenuItemImage`, `MenuItemText`, and `MenuItemUserInput`. The declared snake-case `MenuItemTypes` constants are unused. Menu responses omit menu UUID and comment; nested asset serializers omit asset UUID. A list response therefore does not expose the identifier required by the detail route.
+
+### Behavior API write
+
+```text
+POST/PATCH menu endpoint
+  -> polymorphic child serializer
+  -> nested content is presented as writable
+  -> default ModelSerializer create/update cannot persist writable nested relation
+
+POST/PATCH account endpoint
+  -> may set user/password/header/footer
+  -> menu_items is read-only and cannot be attached through API
+```
+
+No custom nested `create()` or `update()` exists. Binary/text/image/video item writes are therefore incompatible with their writable nested content declaration. User-input serialization omits its required `content` relation entirely, so create cannot satisfy the database model and reads lose the command, expected response, and delay. Account/menu association changes require admin or direct model access.
+
+### Admin mutation and refresh
+
+```text
+Permission/TerminalMenuSet inline edit under device
+  -> save inline rows and M2M alert states
+  -> re-save parent device
+  -> device update side effect
+
+standalone user/code/menu/account/asset edit
+  -> save behavior row
+  -> no observed dependent-device refresh
+```
+
+Device refresh is coupled to a particular admin save path rather than domain changes. An API or standalone admin edit to menu content, account fields, account membership, access code, or an underlying asset can leave devices unchanged until another update trigger occurs.
+
+### Deletion cascades
+
+```text
+delete SkabenUser
+  -> delete AccessCodes -> delete Permissions
+  -> delete TerminalAccounts -> delete TerminalMenuSets and account M2M rows
+  -> referenced MenuItems remain
+
+delete typed Asset
+  -> delete referencing typed MenuItems
+  -> remove their account M2M rows
+
+delete Lock/Terminal
+  -> delete Permission/TerminalMenuSet rows
+```
+
+Deleting an alert state removes corresponding M2M join rows and can leave a permission or terminal assignment with no active states. Public API deletion of menu items and accounts makes relevant cascades remotely reachable under current REST defaults.
+
+## 4. Contracts
+
+### Game identity and access codes
+
+- `SkabenUser` uses an integer primary key; `name` is globally unique and both name and description allow at most 96 characters.
+- `AccessCode` uses an integer primary key; `code` is globally unique, case-sensitive according to database collation, and allows at most 16 characters.
+- Model help text calls the code arbitrary numeric/card data, but no numeric, length-6, whitespace, or normalization validator exists.
+- Deleting a user cascades to every access code and terminal account owned by that user.
+- Unknown-code bootstrap uses fixed user name `skaben_default`; its `get_or_create` lookup also includes description, which can race or conflict with the unique name if the description differs.
+- Fixture evidence contains six-character code `BB4BCE`; it does not establish that all persisted codes are six characters.
+
+### Lock permission
+
+- Exactly one `Permission` row may exist for a card/lock pair; the database enforces `unique_together(card, lock)`.
+- A permission has zero or more alert states. No invariant requires at least one state.
+- Deleting the card or lock cascades to the permission; deleting an alert state only removes M2M membership.
+- Lock projection is a map keyed by raw access-code string with a list of alert-state database IDs.
+- State list order is queryset/database order and is not explicitly stable.
+- A newly bootstrapped access code receives no permission and therefore does not appear in any lock ACL until configured separately.
+
+### Polymorphic menu item
+
+- Base and child rows use multi-table polymorphic inheritance and a UUID primary key inherited from `BaseModelPolymorphic`.
+- Base fields are signed small integer `timer`, required `label` up to 128 characters, and optional operator-only `comment` up to 128 characters.
+- No model validator rejects negative timers; database range is backend-dependent signed-small-integer range.
+- Every concrete child has one required typed asset FK with `on_delete=CASCADE`; an asset can be reused by multiple menu items.
+- User-input items additionally expose `input_label` up to 64 and `input_description` declared as `TextField(max_length=256)`. The database may not enforce the text maximum without model/form validation.
+- `MenuItemTypes` contains snake-case type names, but storage and API polymorphism use model classes instead; `MENU_ITEM_CHOICES` is a one-shot generator and has no source consumer.
+- Base item hash includes content hash, timer, and label. It excludes item UUID, concrete type, comment, and account membership.
+- User-input item hash adds prompt label/description but omits its asset action, expected value, and delay because `UserInput` has no hash property.
+
+### Terminal account
+
+- Account UUID is the stable identifier. User is required and deleting it cascades to the account.
+- `password` is nullable/blank/default empty, has no declared `max_length`, and is stored as plaintext; it is a game credential, not Django authentication.
+- `header` and `footer` are required strings up to 64 characters with current terminal defaults.
+- `menu_items` is an unordered M2M set. The confusing reverse relation is also named `menu_items`.
+- Account hash includes plaintext password, header, footer, and menu-item hashes in queryset order. It excludes account UUID and owning user.
+- `has_files` tries `getattr(item, item.option)`, but no menu model defines `option`; accessing it raises `AttributeError`. No source caller was found.
+- Deleting an account removes terminal assignments and M2M links but does not delete menu items or assets.
+
+### Terminal assignment
+
+- Each row requires one terminal and one account plus zero or more alert states.
+- There is no unique constraint on `(terminal, account)` and no explicit assignment ordering.
+- Deleting account or terminal cascades to the assignment. Deleting alert states can leave an empty assignment.
+- Terminal account-state projection uses string account UUID keys and lists of alert-state IDs.
+- Duplicate assignment rows are ambiguous: related-account output duplicates accounts and the state map overwrites by UUID.
+- The serializer schema currently infers the computed account-state map too weakly; generated schema represents it as a string rather than its object/map shape.
+
+### REST API
+
+- Router base is `/api/behavior/`; both viewsets expose list, retrieve, create, update, partial update, and destroy.
+- Viewsets declare neither authentication nor permission classes. Project settings configure token authentication but no default permission class, leaving DRF's default `AllowAny`; authentication middleware enforcement is commented out.
+- Menu discriminator field is `resourcetype` with Python class-name values. This is a current wire contract despite differing unused constants.
+- Menu base output is `timer` and `label`; audio/video/image/text add nested `content`; user input adds prompt fields but not content.
+- Menu output omits UUID, comment, and hash. `hash = SerializerMethodField()` is declared on the unused base serializer but omitted from `Meta.fields` and has no `get_hash()` implementation.
+- Nested asset output follows asset serializers: name plus file/path fields as applicable, without asset UUID.
+- Standard DRF model serializers do not support the declared writable nested asset relation without custom persistence methods.
+- Account output is `uuid`, `menu_items`, numeric `user`, `password`, `header`, and `footer`. Menu items are read-only.
+- `TerminalAccountSerializer.get_hash()` is an ordinary unused method; no serializer field calls it.
+- `TerminalMenuSetSerializer` exists but has no behavior route or source caller.
+- No explicit queryset ordering, filtering, pagination, ownership check, rate limit, optimistic concurrency, or audit event is defined locally.
+
+### Admin ownership
+
+- `MenuItem` is registered as a polymorphic parent; concrete child models are hidden from the app index but remain registered for direct child editing.
+- Child admin fields expose label, content, and timer; user-input adds its prompt fields. The base `comment` is omitted from concrete child forms.
+- Users, access codes, and terminal accounts are registered on the custom admin site.
+- Permission ownership is presented inline under `LockDevice`; terminal assignment ownership is presented inline under `TerminalDevice`.
+- Terminal account admin exposes plaintext password and a menu-item selector.
+- Only the device-inline save path explicitly re-saves the parent device to request a configuration update.
+
+### Device projection and refresh
+
+- Lock ACL changes affect lock hash/config because permissions and alert-state IDs are consumed by the lock model.
+- Terminal API embeds accounts and exposes `account_state_map`; account/menu serialization reuses behavior serializers and therefore exposes plaintext game passwords.
+- Observed terminal hash is order-sensitive and does not reliably cover assignment-state mapping.
+- `TerminalDevice` does not define a behavior-specific MQTT config override; inherited base config does not itself serialize account/menu contents. The confirmed full menu consumer is the terminal REST representation.
+- Behavior models have no signals, domain events, outbox, or transaction hook that refresh every affected lock/terminal after standalone edits.
+- Downstream publish failures are not observable to these models and are documented in the core transport reviews.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Anonymous behavior API request | Full menu/account CRUD is allowed by default | Require explicit authenticated role and object/action policy |
+| Menu create/update with nested typed asset | Default serializer rejects unsupported writable nested relation or fails persistence | Accept an existing asset ID or implement validated transactional nested ownership |
+| User-input menu create | Required `content` cannot be supplied through serializer | Include an explicit existing `UserInput` reference and validate subtype |
+| Menu list consumer needs detail/delete URL | UUID is absent from response | Expose stable UUID in every representation |
+| User-input menu read | Command/expected value/delay are omitted | Include intentional player/runtime projection without leaking operator-only data |
+| Account API changes menu membership | Field is read-only; request cannot perform change | Provide explicit ordered membership command or document admin-only ownership |
+| Duplicate terminal/account assignment | Duplicate account output; state-map value overwritten nondeterministically | Database uniqueness or an explicitly modeled ordered/merged relationship |
+| Assignment alert states change | Terminal hash may remain unchanged; no general refresh | Include normalized state mapping in version/hash and enqueue affected terminal update after commit |
+| Menu/account queryset order changes | Hash changes without semantic data change, or presentation order drifts | Persist explicit order and hash canonical ordered projection |
+| User-input action/expected/delay changes | Menu/account hash does not change | Version/hash all runtime-relevant fields |
+| Menu/account/asset standalone edit | No observed dependent terminal refresh | Resolve dependents and emit durable post-commit refresh jobs |
+| Direct permission or state M2M edit | Lock may not be re-saved/refreshed | Emit durable affected-lock refresh after transaction commit |
+| Asset deletion | Referencing menu items are cascaded and remotely disappear from accounts | Protect referenced content or perform explicit reviewed aggregate deletion |
+| User or access-code deletion | Cascades remove accounts, assignments, or permissions | Preview impact, authorize destructive action, transact, audit, and refresh dependents |
+| Alert-state deletion | Permission/assignment remains with empty state set | Protect referenced states or define empty-set semantics and validation |
+| Concurrent permission creation | Database rejects duplicate pair; API/admin may surface raw integrity error | Idempotent upsert or typed conflict response |
+| Concurrent terminal assignment creation | Both rows can succeed | Unique constraint plus conflict-safe service |
+| Access code format differs by entrypoint | Model/admin allow up to 16; bootstrap requires exactly 6 | One canonical normalization/validation policy with explicit legacy compatibility |
+| Default-user bootstrap races or description differs | Unique-name integrity error; event is ultimately lost under current worker settlement | Atomic identity lookup by unique key with deterministic defaults and retry policy |
+| `TerminalAccount.has_files` is accessed | Raises because `MenuItem.option` does not exist | Remove dead API or implement subtype-safe asset projection with tests |
+| Plaintext game password read via public API | Credential disclosed to any caller | Restrict exposure, separate write/read DTOs, and document whether reversible storage is required |
+| Device update publish fails | Save can appear successful with stale device | Transactional outbox, observable delivery state, retry, and reconciliation |
+
+- Concurrency/order: only card/lock uniqueness is enforced. Menu order, terminal account order, state order, and duplicate terminal assignment behavior are implicit database behavior.
+- Reliability: no idempotency key, revision, outbox, retry record, reconciliation job, or atomic boundary joins behavior changes to device refresh. M2M changes occur outside normal model `save()` hooks.
+- Security/operations: CRUD is effectively public, game passwords are serialized in plaintext, destructive cascades are reachable, and no local audit trail records who changed access or terminal behavior.
+
+## 6. Gaps
+
+- Tests: no package tests characterize model constraints, CRUD authorization, polymorphic reads/writes, menu ordering, hashing, cascades, duplicate assignments, refresh triggers, or terminal/lock projections.
+- Docs: no authoritative behavior API or domain documentation was found. Serializer/schema output understates the account-state map and does not disclose broken write behavior.
+- Validation: canonical access-code format/case/whitespace, negative timer meaning, empty alert-state-set meaning, terminal account ordering, password secrecy, and asset ownership rules are undefined.
+- Validation: the terminal password field has no declared maximum length; confirm the supported Django/backend behavior and establish a compatible bound.
+- Validation: confirm the terminal client contract for `resourcetype`, nested asset fields, `accounts`, `account_state_map`, UUIDs, and whether passwords must be delivered reversibly.
+- Defects: menu API omits UUID, writable nested item creation is unsupported, user-input content is absent, and declared serializer hash hooks are inert.
+- Defects: `TerminalAccount.has_files` references nonexistent `item.option`; terminal assignment duplicates are legal; hash inputs omit runtime-relevant state and user-input content.
+- Defects: standalone domain edits do not consistently schedule affected-device refresh, and update delivery success is not observable.
+- Evidence: `skaben_data.json` contains users, one six-character access code, and one permission, but no menu/account/terminal-assignment examples; it is supporting evidence only and was already modified at review time.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `GameIdentityRepository` | Own users and normalized globally unique access codes | preserve IDs and legacy values; atomic unique lookup |
+| `AccessPolicyService` | Grant/revoke one card-lock policy with explicit state set | database uniqueness, nonempty/empty policy decision, authorization and audit |
+| `LockAclProjector` | Produce canonical `{code: state IDs}` device projection | stable ordering, compatible IDs/wire shape, revision includes all ACL inputs |
+| `MenuItemRepository` | Persist typed menu items referencing existing typed assets | UUID stability, subtype/content integrity, deletion policy |
+| `OrderedMenuService` | Own account menu membership and player-visible order | explicit position, transactional reorder, canonical hash |
+| `TerminalAccountService` | Own account fields, game-secret policy, and menu composition | separate operator/write/device/read DTOs; preserve client compatibility |
+| `TerminalAssignmentRepository` | Assign unique account-terminal pairs with state availability | unique pair, explicit state semantics and account ordering |
+| `TerminalProjectionService` | Build accounts, menu content, state map, and revision | one validated wire schema; all runtime-relevant fields included |
+| `BehaviorRefreshOutbox` | Record affected locks/terminals after committed domain changes | idempotent delivery, retry/DLQ, reconciliation, observable status |
+| `BehaviorApi` | Authorized commands and stable read projections | no implicit nested writes, typed conflicts, safe destructive operations |
+| `BehaviorAdminAdapter` | Human editing over the same services | impact preview, audit actor, no admin-only side-effect semantics |
+
+## 8. Migration Order
+
+1. Characterize existing lock ACL, menu/account, terminal state-map, hash, API discriminator, deletion, and failure behavior.
+2. Lock down behavior endpoints and split secret/operator/device/read representations before expanding write support.
+3. Add UUIDs and explicit existing-asset references to menu wire DTOs; implement transactional polymorphic commands.
+4. Define access-code normalization, empty-state semantics, deletion policy, and user-input runtime projection.
+5. Add terminal/account uniqueness and explicit menu/account order, migrating and resolving duplicate assignments first.
+6. Introduce canonical lock/terminal projections whose revisions cover every runtime-relevant field with stable ordering.
+7. Emit durable post-commit affected-device refresh work for permission, state-M2M, asset, menu, membership, account, and assignment changes.
+8. Move API and admin paths onto domain services; add audit, conflict handling, retry/DLQ, and reconciliation.
+9. Remove broken hash hooks, `has_files`, accidental public/cascade behavior, and legacy representations only after client compatibility verification.
+
+## 9. Minimum Tests
+
+- Create/read/update/delete each polymorphic menu subtype using an existing typed asset; reject mismatched or missing asset types.
+- Menu list/detail returns stable UUID and compatible `resourcetype`; user-input projection covers intentional content fields.
+- Anonymous, ordinary authenticated, operator, and admin authorization for read/write/delete and plaintext game-secret exposure.
+- Create/update account and attach/reorder/remove menu items through the chosen ownership boundary.
+- One card/lock grant projects the exact access-code-to-alert-state-ID wire shape in canonical order.
+- Access-code normalization, duplicate/race conflict, six-character bootstrap compatibility, and default-user race.
+- Terminal assignment uniqueness, duplicate-data migration, empty state set, and exact `account_state_map` schema.
+- Explicit menu/account ordering remains stable across reloads and produces stable revisions/hashes.
+- Changing user-input action/expected/delay, assignment states, asset data, menu metadata, or account fields invalidates the correct terminal revision.
+- Standalone admin/API/M2M changes enqueue exactly the affected device refresh after commit; rollback enqueues none.
+- Publish failure retries, dead-letters after policy limit, exposes status, and reconciliation repairs stale devices.
+- Asset, user, code, state, menu, account, lock, and terminal deletion obey reviewed protection/cascade policy and refresh dependents.
+- Existing terminal and lock clients accept the preserved wire fields, discriminator values, IDs, and state-list semantics.
+
+## 10. Do-Not-Lose
+
+- Global user-name and access-code uniqueness, persisted primary keys, and compatibility with existing code strings.
+- One effective card/lock grant and lock ACL wire map `{access_code: [alert_state_database_ids]}`.
+- Six-character unknown-code bootstrap behavior where compatibility requires it, without silently granting permissions.
+- Polymorphic menu subtype identity and current `resourcetype` values until terminal-client migration is verified.
+- Menu/account UUID compatibility and typed links to audio, video, image, text, and user-input assets.
+- Player-facing timer, label, input label/description, terminal header/footer, and reviewed game-password behavior.
+- Terminal account availability by alert-state IDs and the `accounts` plus `account_state_map` client projection.
+- Explicitly chosen menu/account presentation order and a revision that changes for every runtime-relevant modification.
+- Required affected-device refresh after committed access, assignment, account, menu, or asset changes.
+
+<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->

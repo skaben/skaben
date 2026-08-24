@@ -9,6 +9,2112 @@
     }
 },
 {
+    "model": "alert.alertcounter",
+    "pk": 2,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-05-16T16:57:40.416Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 3,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-05-16T17:08:04.475Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 4,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2024-05-16T17:11:02.680Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 5,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-05-16T17:11:25.515Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 6,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-05-20T16:05:15.589Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 7,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-05-23T16:25:48.362Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 8,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-05-23T16:26:08.191Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 9,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-05-23T16:26:27.858Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 10,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-05-23T16:26:40.037Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 11,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-03T14:22:02.537Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 12,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-03T14:24:15.788Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 13,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-03T14:24:23.356Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 14,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-03T15:20:17.768Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 15,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-03T15:21:01.082Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 16,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-08T07:30:35.475Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 17,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-08T07:32:08.287Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 18,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-08T07:32:37.199Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 19,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-08T07:33:22.814Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 20,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-08T07:33:44.155Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 21,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-11T20:12:18.555Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 22,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-11T20:12:40.660Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 23,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-11T20:13:12.083Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 24,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-11T20:13:40.806Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 25,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-11T20:13:58.634Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 26,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-11T20:37:42.710Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 27,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-11T20:38:00.522Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 28,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T09:25:56.996Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 29,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T09:26:38.711Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 30,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:00:52.541Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 31,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T10:01:29.810Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 32,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:03:21.919Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 33,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T10:04:56.329Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 34,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:14:47.625Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 35,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T10:15:31.145Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 36,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:16:34.372Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 37,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-12T10:17:10.266Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 38,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-12T10:23:18.345Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 39,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-12T10:23:43.564Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 40,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:36:46.032Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 41,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T10:37:12.190Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 42,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:37:59.311Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 43,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-12T10:38:20.586Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 44,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-12T10:38:46.350Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 45,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T10:38:59.693Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 46,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-12T10:48:57.214Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 47,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T11:03:14.835Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 48,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-12T11:03:29.811Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 49,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-12T11:03:59.993Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 50,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T11:20:27.976Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 51,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T11:21:01.289Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 52,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T11:21:42.395Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 53,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2024-06-12T11:24:13.482Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 54,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-12T11:24:37.641Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 55,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-12T13:47:13.749Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 56,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-12T20:21:43.834Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 57,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-12T20:21:59.406Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 58,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-13T07:41:55.733Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 59,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-13T07:42:26.614Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 60,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-13T12:56:14.548Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 61,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-13T21:08:56.949Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 62,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-13T21:38:51.936Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 63,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-13T21:39:40.333Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 64,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T07:01:19.259Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 65,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T07:01:30.711Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 66,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T07:02:13.618Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 67,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T07:02:33.175Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 68,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T10:00:35.238Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 69,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T10:01:02.352Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 70,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T10:01:15.103Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 71,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T13:40:27.287Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 72,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T13:40:45.744Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 73,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T14:09:45.888Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 74,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T14:10:06.329Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 75,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T14:10:17.904Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 76,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T15:06:15.415Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 77,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T15:06:33.976Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 78,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T15:06:54.512Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 79,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T15:07:07.068Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 80,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T16:59:07.510Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 81,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T16:59:21.137Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 82,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T16:59:34.943Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 83,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T20:00:11.673Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 84,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T20:00:39.528Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 85,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T20:00:50.994Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 86,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T21:30:05.335Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 87,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T21:30:30.052Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 88,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T21:30:37.436Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 89,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T22:16:16.277Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 90,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-14T22:17:01.149Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 91,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-14T22:58:48.455Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 92,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T22:59:02.421Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 93,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T23:11:49.985Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 94,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T23:11:57.346Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 95,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-14T23:45:30.543Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 96,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-14T23:45:35.923Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 97,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T07:18:41.294Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 98,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T07:19:11.347Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 99,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T07:19:22.010Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 100,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T09:14:47.841Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 101,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T09:15:08.639Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 102,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T09:15:20.076Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 103,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T10:00:00.944Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 104,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T10:07:31.774Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 105,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T11:16:12.311Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 106,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T11:32:36.481Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 107,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T11:33:29.601Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 108,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T11:48:50.647Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 109,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T11:49:11.269Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 110,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T11:49:17.784Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 111,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T12:35:44.598Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 112,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T12:44:03.439Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 113,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T13:52:20.354Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 114,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T13:55:51.647Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 115,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T14:19:08.651Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 116,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T14:19:47.130Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 117,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T15:05:57.463Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 118,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T15:12:06.740Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 119,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T16:21:13.889Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 120,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T16:28:59.821Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 121,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T16:53:45.474Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 122,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T16:54:04.412Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 123,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T16:54:14.576Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 124,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T16:54:21.322Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 125,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T17:41:40.514Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 126,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T17:55:11.728Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 127,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-15T17:56:30.516Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 128,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T17:56:58.503Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 129,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T18:09:56.319Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 130,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T18:10:16.169Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 131,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T18:10:45.703Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 132,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T18:10:54.262Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 133,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T18:56:33.129Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 134,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T19:00:47.900Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 135,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-15T22:09:59.547Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 136,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T22:24:21.321Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 137,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2024-06-15T22:24:28.211Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 138,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-15T22:25:05.881Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 139,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T22:25:21.748Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 140,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-15T22:25:37.653Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 141,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-15T22:26:10.588Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 142,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2024-06-16T00:07:41.355Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 143,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2024-06-16T00:13:11.214Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 144,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-16T00:13:17.240Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 145,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2024-06-16T00:14:51.662Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 146,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2024-06-16T00:15:12.007Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 147,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2025-06-10T10:56:45.168Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 148,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T11:36:48.028Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 149,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-10T12:37:48.542Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 150,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T12:38:15.823Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 151,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-10T13:24:30.047Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 152,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-10T13:24:53.791Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 153,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T13:25:07.285Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 154,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-10T13:25:36.632Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 155,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T13:26:02.860Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 156,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-10T13:28:51.362Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 157,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-10T13:29:02.348Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 158,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-10T13:41:41.661Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 159,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-10T13:41:49.248Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 160,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-10T13:42:11.396Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 161,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T13:42:21.672Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 162,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-10T16:23:40.073Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 163,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2025-06-10T16:24:43.783Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 164,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-10T16:25:13.098Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 165,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-10T16:25:33.533Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 166,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-10T16:25:41.983Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 167,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-11T16:10:25.111Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 168,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-11T16:10:30.425Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 169,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-11T19:07:07.197Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 170,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-11T19:07:24.991Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 171,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-11T19:11:36.259Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 172,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-11T19:12:52.334Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 173,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-11T22:13:56.194Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 174,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-11T22:14:09.300Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 175,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-12T12:45:04.364Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 176,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-12T12:45:13.862Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 177,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-12T19:29:59.720Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 178,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-12T19:30:21.292Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 179,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-12T19:30:44.832Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 180,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-12T20:11:38.163Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 181,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-12T20:14:59.362Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 182,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T12:28:15.892Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 183,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-13T12:29:30.562Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 184,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T13:18:15.466Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 185,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-13T13:18:52.959Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 186,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T14:30:32.469Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 187,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-13T14:38:45.836Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 188,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T15:58:25.983Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 189,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-13T15:58:42.169Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 190,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-13T16:46:07.234Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 191,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T16:46:19.165Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 192,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-13T16:46:38.877Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 193,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-13T16:46:45.518Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 194,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T17:41:28.056Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 195,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-13T17:46:33.118Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 196,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T18:20:47.192Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 197,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-13T18:30:30.575Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 198,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-13T18:31:17.361Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 199,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-13T18:38:56.921Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 200,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T18:39:07.323Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 201,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-13T18:39:26.834Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 202,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T19:32:54.607Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 203,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-13T19:36:01.554Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 204,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T20:34:01.955Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 205,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-13T20:34:17.423Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 206,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-13T21:35:16.807Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 207,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2025-06-13T21:36:49.484Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 208,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-13T21:42:53.810Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 209,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T07:24:14.894Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 210,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T09:08:30.790Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 211,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T09:08:51.366Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 212,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T10:40:15.538Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 213,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T10:40:32.135Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 214,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T11:15:10.794Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 215,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T11:22:41.837Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 216,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-14T11:26:00.399Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 217,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-14T11:26:38.000Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 218,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T12:24:40.581Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 219,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T12:31:51.445Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 220,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T12:45:33.031Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 221,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state cyan",
+        "timestamp": "2025-06-14T12:51:04.110Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 222,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T14:07:25.967Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 223,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-14T14:13:45.770Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 224,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2025-06-14T15:38:22.957Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 225,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-14T15:47:42.341Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 226,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-14T15:47:58.848Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 227,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2025-06-14T17:34:55.956Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 228,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state blue",
+        "timestamp": "2025-06-14T17:41:50.892Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 229,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2025-06-14T18:49:23.777Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 230,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2025-06-14T18:49:36.253Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 231,
+    "fields": {
+        "value": 1,
+        "comment": "reset by alert state green",
+        "timestamp": "2026-02-27T17:32:41.816Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 232,
+    "fields": {
+        "value": 500,
+        "comment": "reset by alert state yellow",
+        "timestamp": "2026-02-27T17:34:10.071Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 233,
+    "fields": {
+        "value": 1000,
+        "comment": "reset by alert state red",
+        "timestamp": "2026-02-27T17:34:48.163Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 234,
+    "fields": {
+        "value": -100,
+        "comment": "reset by alert state black",
+        "timestamp": "2026-02-27T17:35:05.983Z"
+    }
+},
+{
+    "model": "alert.alertcounter",
+    "pk": 235,
+    "fields": {
+        "value": -1,
+        "comment": "reset by alert state white",
+        "timestamp": "2026-02-27T17:37:39.742Z"
+    }
+},
+{
     "model": "alert.alertstate",
     "pk": 1,
     "fields": {
@@ -16,7 +2122,7 @@
         "info": "игротехнический статус - НАСТРОЙКА ИГРЫ.",
         "ingame": false,
         "threshold": -1,
-        "current": true,
+        "current": false,
         "order": 0,
         "auto_change": "increase",
         "auto_level": 0,
@@ -30,11 +2136,11 @@
     "pk": 2,
     "fields": {
         "name": "cyan",
-        "info": "Глубокая консервация, исходный статус на момент прихода игроков в данж.",
+        "info": "Подключен вспомогательный источник питания. Готовность к запуску реактора",
         "ingame": false,
         "threshold": -1,
         "current": false,
-        "order": 1,
+        "order": 3,
         "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
@@ -47,12 +2153,12 @@
     "pk": 3,
     "fields": {
         "name": "blue",
-        "info": "К силовому щитку подключен вспомогательный источник питания.",
+        "info": "Глубокая консервация, исходный статус на момент прихода игроков в данж.",
         "ingame": false,
         "threshold": -1,
         "current": false,
         "order": 2,
-        "auto_change": "False",
+        "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
         "counter_increase": 0,
@@ -67,8 +2173,8 @@
         "info": "Реактор запущен. Основной статус для полноценных действия в данже.",
         "ingame": true,
         "threshold": 1,
-        "current": false,
-        "order": 3,
+        "current": true,
+        "order": 4,
         "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
@@ -85,8 +2191,8 @@
         "ingame": true,
         "threshold": 500,
         "current": false,
-        "order": 4,
-        "auto_change": "False",
+        "order": 5,
+        "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
         "counter_increase": 25,
@@ -102,8 +2208,8 @@
         "ingame": true,
         "threshold": 1000,
         "current": false,
-        "order": 5,
-        "auto_change": "False",
+        "order": 6,
+        "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
         "counter_increase": 25,
@@ -119,12 +2225,188 @@
         "ingame": false,
         "threshold": -100,
         "current": false,
-        "order": 6,
-        "auto_change": "False",
+        "order": 7,
+        "auto_change": "increase",
         "auto_level": 0,
         "auto_timeout": 0,
         "counter_increase": 0,
         "counter_decrease": 0
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 7,
+    "fields": {
+        "mac_addr": "5ccf7f836412",
+        "timestamp": 1772216907
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 8,
+    "fields": {
+        "mac_addr": "5ccf7f237073",
+        "timestamp": 1749973772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 9,
+    "fields": {
+        "mac_addr": "all",
+        "timestamp": 1716482695
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 10,
+    "fields": {
+        "mac_addr": "5ccf7f22832f",
+        "timestamp": 1749973772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 11,
+    "fields": {
+        "mac_addr": "5ccf7f227b83",
+        "timestamp": 1749973772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 12,
+    "fields": {
+        "mac_addr": "5ccf7f22e353",
+        "timestamp": 1772216907
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 13,
+    "fields": {
+        "mac_addr": "2cdb078a9a8f",
+        "timestamp": 1
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 14,
+    "fields": {
+        "mac_addr": "dc4f227c0da1",
+        "timestamp": 1749973772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 15,
+    "fields": {
+        "mac_addr": "dc4f227c0acf",
+        "timestamp": 1749830467
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 16,
+    "fields": {
+        "mac_addr": "5ccf7f849da6",
+        "timestamp": 1749721158
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 17,
+    "fields": {
+        "mac_addr": "124255f5c920",
+        "timestamp": 1749973762
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 18,
+    "fields": {
+        "mac_addr": "12422a54dcf4",
+        "timestamp": 1749891913
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 19,
+    "fields": {
+        "mac_addr": "1242cb2129e4",
+        "timestamp": 1749973762
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 20,
+    "fields": {
+        "mac_addr": "",
+        "timestamp": 1718138808
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 21,
+    "fields": {
+        "mac_addr": "1242CB2129E4",
+        "timestamp": 1718138926
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 22,
+    "fields": {
+        "mac_addr": "124205d2ad79",
+        "timestamp": 1749892092
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 23,
+    "fields": {
+        "mac_addr": "dc4f227c0cc9",
+        "timestamp": 1772215484
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 24,
+    "fields": {
+        "mac_addr": "5ccf7f227b85",
+        "timestamp": 1718201972
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 25,
+    "fields": {
+        "mac_addr": "124241d02f36",
+        "timestamp": 1772215477
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 26,
+    "fields": {
+        "mac_addr": "dc4f227c0bf1",
+        "timestamp": 1749973772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 27,
+    "fields": {
+        "mac_addr": "84f3ebe0d1d0",
+        "timestamp": 1718280772
+    }
+},
+{
+    "model": "core.devicekeepalive",
+    "pk": 28,
+    "fields": {
+        "mac_addr": "000000000000",
+        "timestamp": 1
     }
 },
 {
@@ -154,7 +2436,7 @@
         "channel": "pwr",
         "type": "simple",
         "active": true,
-        "comment": "щиток питания, переключает cyan -> blue -> green состояния"
+        "comment": "щиток питания, переключает blue -> cyan -> green состояния"
     }
 },
 {
@@ -165,6 +2447,368 @@
         "type": "simple",
         "active": true,
         "comment": "шкала индикации уровня тревоги"
+    }
+},
+{
+    "model": "core.devicetopic",
+    "pk": 5,
+    "fields": {
+        "channel": "box",
+        "type": "simple",
+        "active": false,
+        "comment": "коробка"
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 1,
+    "fields": {
+        "config": {
+            "powerstate": "AUX"
+        },
+        "comment": null,
+        "topic": "pwr",
+        "state": 2
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 2,
+    "fields": {
+        "config": {
+            "powerstate": "OFF"
+        },
+        "comment": null,
+        "topic": "pwr",
+        "state": 3
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 3,
+    "fields": {
+        "config": {
+            "powerstate": "PWR"
+        },
+        "comment": null,
+        "topic": "pwr",
+        "state": 4
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 4,
+    "fields": {
+        "config": {
+            "test": "test"
+        },
+        "comment": null,
+        "topic": "box",
+        "state": 3
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 5,
+    "fields": {
+        "config": {
+            "LGT": "1/10-100/0/200-1000/1/100-500/0/20-100/1/50-100/0/1000-2000/C",
+            "RGB": "000080/1000/0/S",
+            "STR": "0/1000/S"
+        },
+        "comment": "Синий аварийный свет, тревожное мерцание ламп, сигнализация выключена",
+        "topic": "rgb",
+        "state": 3
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 6,
+    "fields": {
+        "config": {
+            "LGT": "1/10-100/0/200-1000/1/100-500/0/20-100/1/50-100/0/1000-2000/C",
+            "RGB": "00FFFF/1000/0/S",
+            "STR": "0/1000/S"
+        },
+        "comment": "Аварийный свеет ярче, тревожное мерцание ламп, сигнализация выключена.",
+        "topic": "rgb",
+        "state": 2
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 7,
+    "fields": {
+        "config": {
+            "LGT": "1/1000/S",
+            "RGB": "FFFFFF/1000/0/S",
+            "STR": "0/1000/S"
+        },
+        "comment": "Белый свет, лампы включены, сигнализация выключена",
+        "topic": "rgb",
+        "state": 4
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 8,
+    "fields": {
+        "config": {
+            "LGT": "1/1000/S",
+            "RGB": "804000/1000/0/S",
+            "STR": "1/3000/0/12000/C"
+        },
+        "comment": "Жёлтый свет, лампы включены, изредка воет сирена (3 секунды через 12)",
+        "topic": "rgb",
+        "state": 5
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 9,
+    "fields": {
+        "config": {
+            "LGT": "1/1000/S",
+            "RGB": "FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/00000/1000/0/C",
+            "STR": "1/5000/0/10000/C"
+        },
+        "comment": "Свет работает как стробоскоп с паузами, лампы горят, сирена воет чаще и дольше (5 через 15 секунд)",
+        "topic": "rgb",
+        "state": 6
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 10,
+    "fields": {
+        "config": {
+            "LGT": "0/1000/S",
+            "RGB": "FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/00000/20/0/FF8000/10/0/00000/20/0/FF0000/10/0/C",
+            "STR": "1/1000/S"
+        },
+        "comment": "Непррывный стробоскоп, лампы потушены, сирена орёт непрерывно.",
+        "topic": "rgb",
+        "state": 7
+    }
+},
+{
+    "model": "peripheral_devices.passiveconfig",
+    "pk": 11,
+    "fields": {
+        "config": {
+            "LGT": "1/1000/S",
+            "RGB": "FFFFFF/1000/0/S",
+            "STR": "0/1000/S"
+        },
+        "comment": "Свет белый, лампы горят, сигнализация отключена",
+        "topic": "rgb",
+        "state": 1
+    }
+},
+{
+    "model": "peripheral_devices.lockdevice",
+    "pk": 4,
+    "fields": {
+        "ip": "192.168.0.39",
+        "mac_addr": "1242cb2129e4",
+        "description": "Дверь к ZAX",
+        "timestamp": 1718138925,
+        "override": false,
+        "sound": true,
+        "closed": true,
+        "blocked": false,
+        "timer": 10
+    }
+},
+{
+    "model": "peripheral_devices.lockdevice",
+    "pk": 5,
+    "fields": {
+        "ip": "192.168.0.50",
+        "mac_addr": "12422a54dcf4",
+        "description": "Дверь слева",
+        "timestamp": 1718140194,
+        "override": false,
+        "sound": true,
+        "closed": true,
+        "blocked": false,
+        "timer": 10
+    }
+},
+{
+    "model": "peripheral_devices.lockdevice",
+    "pk": 6,
+    "fields": {
+        "ip": "192.168.0.23",
+        "mac_addr": "124255f5c920",
+        "description": "Ближний замок в подвал",
+        "timestamp": 1718140728,
+        "override": false,
+        "sound": true,
+        "closed": true,
+        "blocked": false,
+        "timer": 10
+    }
+},
+{
+    "model": "peripheral_devices.lockdevice",
+    "pk": 7,
+    "fields": {
+        "ip": "192.168.0.113",
+        "mac_addr": "124205d2ad79",
+        "description": "Дверь подвала",
+        "timestamp": 1718181897,
+        "override": false,
+        "sound": true,
+        "closed": true,
+        "blocked": false,
+        "timer": 10
+    }
+},
+{
+    "model": "peripheral_devices.lockdevice",
+    "pk": 8,
+    "fields": {
+        "ip": "192.168.0.105",
+        "mac_addr": "124241d02f36",
+        "description": "Дальний замок подвал",
+        "timestamp": 1718204560,
+        "override": false,
+        "sound": true,
+        "closed": true,
+        "blocked": false,
+        "timer": 10
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 3,
+    "fields": {
+        "name": "skaben_default",
+        "description": "системный пользователь по умолчанию"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 4,
+    "fields": {
+        "name": "ДЖИП МОРГАН, ЛЕЙТЕНАНТ",
+        "description": "КОМАНДИР ВЗВОДА ОХРАНЫ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 5,
+    "fields": {
+        "name": "МАЙК МАКАЛИСТЕР, МЛ.ЛЕЙТЕНАНТ",
+        "description": "НАЧАЛЬНИК БЛОКА ЖИЗНЕОБЕСПЕЧЕНИЯ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 6,
+    "fields": {
+        "name": "РОБ РОБИНСОН, КАПИТАН",
+        "description": "КОМАНДИР ВЗВОДА ОХРАНЫ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 7,
+    "fields": {
+        "name": "МИХАЭЛЬ ГУСТАФСОН, ПОКОВНИК",
+        "description": "НАЧАЛЬНИК ОБЪЕКТА"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 8,
+    "fields": {
+        "name": "ТИМ УОЛЛЕС, СЕРЖАНТ",
+        "description": "СТАРШИЙ СМЕНЫ РЕАКТОРА"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 9,
+    "fields": {
+        "name": "ИЦХАК КОЭН, АКАКДЕМИК",
+        "description": "ЗАМЕСТИТЕЛЬ КОМАНДИРА ПО НАУЧНОЙ РАБОТЕ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 10,
+    "fields": {
+        "name": "ДЖЕК УАЙТ-ТРЕТИЙ, СТ.СЕРЖАНТ",
+        "description": "НАЧАЛЬНИК АНАЛИТИЧЕСКОЙ ЛАБОРАТОРИИ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 11,
+    "fields": {
+        "name": "АЛЕКС ИВАНОВ, ПОДПОЛКОВНИК",
+        "description": "ЗАМЕСТИТЕЛЬ КОМАНДИРА ПО БЕЗОПАСНОСТИ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 12,
+    "fields": {
+        "name": "МАРК ЭЗЕНБАУМ, ЛЕЙТЕНАНТ",
+        "description": "ЗАВЕДУЮЩИЙ СЕКТОРОМ ПОЛЕВЫХ ИСПЫТАНИЙ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 13,
+    "fields": {
+        "name": "АЛАН РОБИНСОН, СТ.ЛЕЙТЕНАНТ",
+        "description": "РУКОВОДИТЕЛЬ ГРУППЫ ПРИКЛАДНОЙ ФИЗИКИ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 14,
+    "fields": {
+        "name": "ДЖЕЙК СМИТ, СТ,ЛЕЙТЕНАНТ",
+        "description": "РУКОВОДИТЕЛЬ ГРУППЫ ПРИКЛАДНОЙ БИОЛОГИИ"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 15,
+    "fields": {
+        "name": "Забиди Обижа, Капрал",
+        "description": "капрал"
+    }
+},
+{
+    "model": "peripheral_behavior.skabenuser",
+    "pk": 16,
+    "fields": {
+        "name": "Джейм Солтон, капитан",
+        "description": "капитан"
+    }
+},
+{
+    "model": "peripheral_behavior.accesscode",
+    "pk": 20,
+    "fields": {
+        "code": "BB4BCE",
+        "user": 11
+    }
+},
+{
+    "model": "peripheral_behavior.permission",
+    "pk": 34,
+    "fields": {
+        "card": 20,
+        "lock": 8,
+        "state_id": [
+            1
+        ]
     }
 }
 ]

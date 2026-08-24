@@ -1,0 +1,555 @@
+# AGENT REFERENCE: LEGACY TRANSPORT
+
+Reviewed: 2026-08-24
+Scope: `server/core/transport` and direct callers
+Purpose: behavior map for migration into the modern Django template
+
+## 0. Agent Rules
+
+1. Read `server/core/.agent-review` first.
+2. Treat `server/core/transport` as the source of current transport behavior.
+3. Read `server/core/worker_queue_handlers/.agent-review` with this file.
+4. Preserve routing/wire contracts only after characterization tests confirm
+   them.
+5. Do not preserve swallowed publish failures, empty exchange configuration,
+   or model-triggered publishing as desired behavior.
+6. Keep broker adapters, message DTOs, domain events, and handler policy in
+   separate modules in migrated code.
+7. A publish operation must return success or raise a typed error.
+8. Message acknowledgement belongs to the consumer, not the DTO/publisher.
+
+## 1. Files to Read
+
+Primary:
+
+- `server/core/transport/config.py`
+- `server/core/transport/publish.py`
+- `server/core/transport/events.py`
+- `server/core/transport/packets.py`
+- `server/core/transport/topics.py`
+
+Runtime callers:
+
+- `server/core/management/commands/start_worker.py`
+- `server/core/worker_queue_handlers/base.py`
+- `server/core/worker_queue_handlers/internal.py`
+- `server/core/worker_queue_handlers/client_update.py`
+- `server/core/scheduler/tasks.py`
+- `server/core/tasks.py`
+- `server/alert/models.py`
+- `server/peripheral_devices/models/base.py`
+
+Event subclasses:
+
+- `server/event_contexts/alert/events.py`
+- `server/event_contexts/device/events.py`
+- `server/peripheral_devices/events.py`
+
+Tests/docs:
+
+- `server/tests/test_core/test_events.py`
+- `server/tests/test_core/test_packets.py`
+- `docs/development/transport.md`
+- `docs/development/addressing.md`
+
+## 2. Transport Vocabulary
+
+Do not mix these concepts:
+
+| Concept | Values/examples | Purpose |
+| --- | --- | --- |
+| exchange | `mqtt`, `internal` | RabbitMQ routing domain |
+| queue | `ask`, `internal`, `state_update`, `client_update` | durable processing stage |
+| device topic | `lock`, `terminal`, `rgb`, `scl`, `pwr`, `box` | device family/channel |
+| packet type | `ping`, `pong`, `info`, `cup`, `sup`, `ack`, `nack` | device protocol command |
+| event type | `alert_state`, `alert_counter`, `device`, `log` | internal domain event identity |
+| routing key | dot-separated string | broker delivery address |
+
+Packet and event are different wire formats:
+
+- Packet: device protocol; identity is in routing key; no AMQP event headers.
+- Event: internal protocol; identity is mainly in AMQP headers; body contains
+  event-specific fields.
+
+## 3. Exchanges and Queues
+
+### 3.1 Connection
+
+`get_connection()` creates a Kombu `Connection` descriptor from
+`settings.AMQP_URI` with publisher confirms requested through
+`transport_options={"confirm_publish": True}`.
+
+Relevant settings:
+
+- `AMQP_URI = pyamqp://<user>:<pass>@rabbitmq:5672`
+- `ASK_QUEUE = ask`
+- `AMQP_TIMEOUT = 10` is not used by this package.
+
+Important: when credentials are absent, settings still build the truthy string
+`pyamqp://None:None@rabbitmq:5672`. `MQConfig.__init__()` therefore does not
+detect missing credentials with its `if not settings.AMQP_URI` check.
+
+### 3.2 Exchange topology
+
+| Exchange | Type | Intended traffic |
+| --- | --- | --- |
+| `mqtt` | topic | packets to/from RabbitMQ MQTT integration |
+| `internal` | topic | internal packets, commands, and events |
+
+Durability and other exchange options rely on Kombu defaults; they are not
+declared explicitly in project code.
+
+### 3.3 Queue topology
+
+| Queue | Exchange | Binding | Consumer role |
+| --- | --- | --- | --- |
+| `ask` | `mqtt` | `ask.#` | MQTT ingress |
+| `internal` | `internal` | `internal.#` | router/domain events |
+| `state_update` | `internal` | `state_update.#` | persist device SUP |
+| `client_update` | `internal` | `client_update.#` | emit device CUP |
+
+All queues are declared durable.
+
+Implementation detail: `on_broker_ready()` first constructs `ask` in the set
+of internal queues, then overwrites that dictionary entry with the MQTT-bound
+`ask` queue before declaration. Net result: one `ask` queue bound to `mqtt`.
+
+### 3.4 Initialization lifecycle
+
+`MQConfig.init_exchanges_and_queues()`:
+
+1. Returns early when the instance flag says initialization completed.
+2. Creates/binds `mqtt` and `internal` exchanges.
+3. Builds and declares all four queues.
+4. Retries only Kombu `OperationalError` up to 30 attempts.
+5. Uses exponential delays capped at 64 seconds per wait.
+
+Each legacy worker process owns a separate `MQConfig` and repeats topology
+initialization. Exchange and queue declaration is idempotent only while broker
+arguments remain compatible.
+
+`CoreConfig.ready()` only constructs and discards an `MQConfig`; it does not
+initialize exchanges/queues and does not create a shared publisher.
+
+## 4. Publisher Contract
+
+### 4.1 Low-level `publish()`
+
+Input:
+
+- `body`
+- exchange object or value
+- routing key
+- arbitrary Kombu keyword arguments such as headers
+
+Actions:
+
+1. Converts any falsy body (`None`, `""`, `0`, `False`) to `{}`.
+2. Creates a connection descriptor.
+3. Acquires a synchronous producer from Kombu's producer pool.
+4. Calls `Producer.publish()` with `declare=[exchange]` and `retry=True`.
+5. Catches every exception and logs it.
+6. Returns `None` for both success and failure.
+
+Critical consequences:
+
+- Callers cannot determine whether publish succeeded.
+- Consumer code commonly acknowledges the source after a failed publish.
+- Valid falsy payloads do not survive unchanged.
+- No project retry policy, maximum retries, backoff, timeout, or typed error is
+  supplied.
+- Every call is blocking.
+
+### 4.2 `MQPublisher`
+
+Methods:
+
+| Method | Exchange | Routing | Body |
+| --- | --- | --- | --- |
+| `send_mqtt(packet)` | `config.exchanges["mqtt"]` | packet routing key | `packet.encode()` |
+| `send_event(event)` | `config.exchanges["internal"]` | `internal` | encoded event body + headers |
+| `publish(...)` | caller-supplied | caller-supplied | caller-supplied |
+
+The context manager performs no setup or teardown.
+
+### 4.3 Critical initialization defect
+
+`get_interface()` returns `MQPublisher(get_mq_config())`.
+
+Fresh `MQConfig` state:
+
+```text
+config.exchanges == {}
+config.queues == {}
+config._exchanges_initialized == False
+```
+
+`send_mqtt()` and `send_event()` use direct dictionary `.get()` calls, not the
+lazy `mqtt_exchange`/`internal_exchange` properties. They therefore pass
+`exchange=None` unless that exact config instance was initialized elsewhere.
+
+The same defect affects direct callers that use
+`publisher.config.exchanges.get(...)`.
+
+Known affected paths:
+
+- alert model `save()` event publishing
+- device model `save()` MQTT publishing
+- scheduler PING publishing
+- scheduler alert-event publishing
+- startup/all-device refresh publishing
+- `ClientUpdateHandler` MQTT delivery
+- `InternalHandler` follow-up event publishing
+- alert-context client-update fanout
+
+`BaseHandler.dispatch()` differs: it receives the initialized `MQConfig` from
+`start_worker` and accesses lazy exchange properties. That path has a named
+exchange available.
+
+Migration instruction: treat the intended named exchange as the contract;
+characterize actual broker behavior of `exchange=None` but do not reproduce it.
+
+## 5. Routing Contracts
+
+### 5.1 Server to device
+
+```text
+<device_type>.<device_uid>.<packet_type>
+```
+
+Examples:
+
+- `lock.00ff00ff00ff.cup`
+- `rgb.all.ping`
+
+Published to exchange `mqtt`.
+
+### 5.2 Device to server
+
+```text
+ask.<device_type>.<device_uid>.<packet_type>
+```
+
+Example: `ask.lock.00ff00ff00ff.info`
+
+Arrives through exchange `mqtt` and queue `ask`.
+
+### 5.3 Internal packet routing
+
+```text
+internal.<device_type>.<device_uid>.<packet_type>
+state_update.<device_type>.<device_uid>
+client_update.<device_type>.<device_uid-or-all>
+```
+
+### 5.4 Internal event routing
+
+Routing key is exactly `internal`; event identity is carried in headers.
+
+### 5.5 Routing validation gaps
+
+- `format_routing_key()` only joins strings with dots.
+- DTOs do not reject dots, wildcards, empty segments, or reserved values in
+  topic/UID fields.
+- Queue-stage and device-topic vocabularies are plain strings with no shared
+  validated routing object.
+
+## 6. Packet DTOs
+
+File: `packets.py`
+Library: Pydantic v2
+
+### 6.1 Packet type registry
+
+| Type | Direction/current use |
+| --- | --- |
+| `PING` | server to device; scheduler |
+| `PONG` | device to server; string constant only, no DTO class |
+| `INFO` | device event payload; class exists but ingress uses raw dict |
+| `CUP` | both config request and config delivery; class used for delivery |
+| `SUP` | device state upload; class exists but ingress uses raw dict |
+| `ACK` | class exists; unused |
+| `NACK` | class exists; unused |
+
+### 6.2 Base packet
+
+Fields:
+
+- `topic: str`
+- `uid: str = "all"`
+- `command: str`
+- `timestamp: int = server time`
+
+Computed routing key:
+
+```text
+<topic>.<uid>.<command>
+```
+
+`encode()` returns a JSON string, not a dict. It excludes `topic`, `uid`,
+`command`, and computed `routing_key` from the body.
+
+Wire risk requiring characterization: the JSON string is passed to Kombu
+without an explicit serializer/content type. Verify whether the broker/MQTT
+client sees the intended JSON bytes or a second JSON encoding layer.
+
+### 6.3 PING
+
+- Command fixed by default to `ping`.
+- Body contains only `timestamp`.
+- Default UID is `all`.
+
+### 6.4 Datahold packets
+
+Shared body fields:
+
+- `timestamp`
+- `datahold`
+- optional `task_id` on INFO/SUP/CUP
+- optional `config_hash` on CUP
+
+Custom constructor behavior:
+
+- Requires `topic`, `datahold`, and `timestamp` even though base timestamp has a
+  default factory.
+- Constructor default `uid=None` is passed explicitly to a required string
+  field, so omitting UID can fail instead of using base default `all`.
+- `datahold` and `task_id` are assigned after initial model construction.
+- Assignment validation is not enabled, so those post-init values bypass normal
+  Pydantic validation.
+- `datahold` uses a mutable `{}` default instead of a factory.
+
+Protocol gaps:
+
+- Docs mention outbound `overwrite`, but no packet field models it.
+- Ingress normalization uses body field `hash`; CUP DTO uses `config_hash`.
+  Confirm client protocol before renaming either field.
+- Packet type fields are ordinary strings with defaults, not `Literal`, so a
+  caller can override a subclass command with an inconsistent value.
+
+## 7. Event DTOs
+
+File: `events.py`
+
+### 7.1 Base event
+
+Fields:
+
+- `_event_type`: class-level discriminator used by `has_event_type()`
+- `event_type`: instance string serialized into headers
+- `event_source`: instance string serialized into headers
+
+Encoding:
+
+1. Fields listed by `headers` become AMQP headers.
+2. Those fields are excluded from event body.
+3. Remaining model fields become a dict body.
+
+Base headers: `event_type`, `event_source`.
+
+Decoding:
+
+1. Parse body if it is JSON text.
+2. Start with `event_type` and `event_source` from headers.
+3. Merge body fields after header fields.
+
+Critical decode behavior: body fields override same-named header fields because
+the body mapping is merged last. Event identity/source can therefore change
+during decode.
+
+Discriminator risk: `_event_type` and `event_type` duplicate identity and can
+diverge. `has_event_type()` checks the class variable; context dispatch often
+checks the instance field.
+
+### 7.2 Known events
+
+| Event | Extra headers | Body fields |
+| --- | --- | --- |
+| `SkabenLogEvent` | `level` | `message`, `message_data`, `save` |
+| `AlertStateEvent` | none | `counter_reset`, `state` |
+| `AlertCounterEvent` | none | `value`, `change`, `comment` |
+| `SkabenDeviceEvent` | `device_type`, `device_uid` | `payload` |
+| `DeviceNotFoundEvent` | none | none |
+
+`DeviceNotFoundEvent` is defined but not emitted by the current state worker.
+
+### 7.3 Device event validation
+
+`SkabenDeviceEvent` validates `device_type` against static `SkabenTopics.all`,
+not DB-configured `DeviceTopic` rows.
+
+The validator raises `pydantic.ValidationError` directly with a string. Field
+validators should raise a value/type/assertion error; this path may produce an
+unexpected constructor error. Characterize it before migration.
+
+`payload` uses mutable `{}` as its default.
+
+### 7.4 Event context in transport module
+
+`SkabenEventContext` is not a transport DTO. It owns mutable generated-event
+state, context-manager behavior, and a log-event factory. Current alert/device
+domain contexts inherit from it.
+
+Migration instruction: move event context/state-machine behavior to services;
+keep transport events as immutable DTOs.
+
+## 8. Topic Registry
+
+File: `topics.py`
+
+Static values:
+
+| Category | Topics |
+| --- | --- |
+| simple | `box`, `rgb`, `scl`, `pwr` |
+| smart | `lock`, `terminal` |
+| all | simple + smart |
+
+This registry is used by:
+
+- device-event validation
+- passive-device model choices
+- client-update branching
+- power/lock domain logic
+
+The database independently stores `DeviceTopic.channel`, `type`, and `active`.
+The static registry and DB can diverge. Current code sometimes trusts static
+topics and sometimes trusts DB topics.
+
+Migration instruction: define one canonical topic registry/configuration seam.
+If DB extensibility is required, static Pydantic validation must not reject a
+DB-valid topic.
+
+## 9. Recurrent Task Constants
+
+`SkabenRecurrentTasks` lives in `config.py` and defines `ping` plus
+`alert_change`. No current runtime caller uses it; scheduler dispatch uses
+`core.scheduler.types.SkabenTaskType` instead.
+
+Migration instruction: remove the duplicate registry or make one scheduler task
+registry authoritative. It does not belong in the broker topology module.
+
+## 10. Failure and Reliability Matrix
+
+| Concern | Current behavior |
+| --- | --- |
+| connection setup | synchronous; worker startup retries `OperationalError` |
+| topology declaration | repeated by every worker process |
+| publish | synchronous producer-pool call |
+| publisher confirmation | requested in transport options; result not exposed |
+| publish retry | Kombu `retry=True`; no project policy |
+| publish failure | catch/log/return `None` |
+| empty/falsy body | replaced with `{}` |
+| producer exchange via `get_interface()` | named exchange missing (`None`) |
+| consumer acknowledgement | handled externally by worker callbacks |
+| idempotency | absent |
+| outbox | absent |
+| dead letter | absent |
+| tracing/message ID | absent |
+| schema version | absent |
+
+## 11. Tests and Known Test Defects
+
+Current packet coverage:
+
+- One test checks CUP JSON body for explicit UID/topic/data/timestamp.
+- No routing-key, PING, INFO, SUP, ACK/NACK, validation, or publisher test.
+
+Current event coverage intends to test base init/encode/decode, but
+`test_events.py` imports `EncodedEventType`. The implementation defines
+`EncodedEvent`; no alias exists. The test module therefore cannot collect as
+written.
+
+No tests cover:
+
+- exchange/queue topology
+- initialization/retry
+- `get_interface()` exchange state
+- successful or failed publish
+- actual serialized MQTT wire bytes
+- event subclasses or discriminator mismatch
+- body overriding event headers
+- static/DB topic divergence
+
+## 12. Target Transport Boundaries
+
+Target shape for one Python async worker:
+
+```text
+transport/
+  rabbitmq.py          # async connection, channels, topology, consume/publish
+  routing.py           # validated route objects and routing-key codec
+  packets.py           # immutable device protocol DTOs
+  events.py            # immutable internal event DTOs
+  outcomes.py          # success/discard/retry/dead-letter
+
+services/
+  ingress.py
+  alert_state_machine.py
+  device_events.py
+  device_configuration.py
+
+repositories/
+  keepalive.py
+  alert.py
+  device.py
+  stream.py
+```
+
+Required transport interface:
+
+```text
+connect() -> initialized shared transport
+consume(queue, handler, qos)
+publish(exchange, route, message) -> success or typed exception
+close()
+```
+
+Do not create a new broker connection/config object for each domain publish.
+The worker supervisor should own transport lifecycle and inject a publisher
+port into handlers/services.
+
+## 13. Migration Order
+
+1. Add wire-level characterization tests for packets and events.
+2. Add topology tests for exact exchanges, queues, and bindings.
+3. Make `get_interface()` initialization defect visible with a failing test.
+4. Define canonical routing DTOs and reject invalid segments.
+5. Replace publish catch-and-log with typed outcomes/errors.
+6. Create one initialized transport lifecycle per worker process.
+7. Inject publisher ports; stop constructing transport in models/services.
+8. Remove publishing from Django model `save()` methods.
+9. Separate event contexts from event DTOs.
+10. Introduce async consumers with queue-specific QoS and bounded concurrency.
+11. Add retry/dead-letter/idempotency policy before enabling parallel handling.
+12. Preserve legacy routing keys until all device clients are migrated.
+
+## 14. Minimum Characterization Tests
+
+- Declare exact exchange types, queue durability, and bindings.
+- Missing credentials/URI and broker unavailable startup behavior.
+- Publisher uses named exchange after initialization.
+- Publish success, broker rejection, timeout, retry exhaustion, and reconnect.
+- Falsy body behavior for `None`, `{}`, `""`, `0`, and `False`.
+- Exact wire bytes/content type for PING and CUP through Kombu.
+- Packet routing for every topic/UID/command combination.
+- Datahold UID omitted, payload validation, task ID, hash, and overwrite cases.
+- Base event encode/decode and JSON-body decode.
+- Header/body identity conflict.
+- Every event subclass's exact headers and body.
+- Invalid and DB-configured device topics.
+- Publisher lifecycle and graceful shutdown.
+
+## 15. Do-Not-Lose Contracts
+
+- External device routes remain dot-separated.
+- Device ingress remains `ask.<type>.<uid>.<packet>`.
+- Server delivery remains `<type>.<uid>.<packet>`.
+- Internal queue prefixes remain `internal`, `state_update`, and
+  `client_update` during compatibility migration.
+- PING body contains server timestamp.
+- CUP carries timestamp and `datahold`; smart CUP carries configuration hash if
+  clients depend on it.
+- Internal event identity/source remain available to domain handlers.
+- Device events retain device type/UID addressing.
+- RabbitMQ queues remain durable while they are cross-process boundaries.

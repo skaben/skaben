@@ -1,0 +1,212 @@
+# AGENT REFERENCE: SERVER PROJECT MAP
+
+Reviewed: 2026-08-24
+Scope: `server` and direct runtime/deployment dependencies
+Purpose: brief project description, structure map, process map, and routing guide for deeper reviews
+
+## 0. Rules
+
+1. Read this file before any child `.agent-review` under `server/`.
+2. Read the nearest child review before changing its area; this root map is an index, not a substitute for code inspection.
+3. Treat `server/` code, migrations, worker settlement, and deployment entrypoints as authoritative; use tests, docs, generated schema, and fixtures as supporting evidence.
+4. Preserve confirmed HTTP, database, event, packet, device, and data contracts, not accidental public access, swallowed failures, or model-save side effects.
+5. Keep HTTP/admin adapters, domain rules, persistence, scheduling, transport, device I/O, and operational logging separate.
+6. Make transactions, ordering, concurrency, retries, settlement, startup/shutdown, and external dependencies explicit.
+
+## 1. Sources
+
+- Application: `server/{settings,core,alert,assets,event_contexts,peripheral_behavior,peripheral_devices,streams,admin_extended}`
+- HTTP entrypoint: `wsgi.py`, `server/core/urls.py`, and `entrypoint.sh`
+- Process entrypoints: `server/core/management/commands/{start_worker,start_scheduler,wait_for_db,check_integrity}.py`
+- Deployment: `docker-compose.yml`, `docker/`, `Makefile`, `pyproject.toml`, and `.env`/environment settings
+- Persistence: app migrations, PostgreSQL, Redis cache/scheduler state, `/media` filesystem storage, and `skaben_data.json`
+- Messaging: RabbitMQ internal exchange/queues plus MQTT-facing exchange/topics
+- Evidence: `server/tests`, `docs`, and generated `schema.yml`
+
+## 2. Structure
+
+Project purpose: SKABEN is a Django control plane for a game/dungeon environment. It manages global alert state, player access, terminal content, smart/passive device configuration, device events, and operator logs. HTTP/admin changes and device input converge through PostgreSQL-backed domain models and RabbitMQ workers; configuration is sent to physical clients over MQTT.
+
+| Path/component | Responsibility | Detailed review |
+| --- | --- | --- |
+| `server/settings.py` | Django, PostgreSQL, cache, Redis, RabbitMQ, media, REST, CORS, and game constants | this file and `core` review |
+| `server/core` | Shared models/utilities, custom admin, REST/ops routes, health checks, transport, workers, scheduler, and management commands | `server/core/.agent-review` |
+| `server/core/transport` | RabbitMQ topology, event/packet DTOs, MQTT/internal publishing, routing topics | `server/core/transport/.agent-review` |
+| `server/core/worker_queue_handlers` | MQTT ingress, internal event dispatch, client config delivery, and reported-state persistence | `server/core/worker_queue_handlers/.agent-review` |
+| `server/core/scheduler` | Redis-gated periodic alert tasks | `server/core/scheduler/.agent-review` |
+| `server/alert` | Global named alert state, numeric counter, transition rules, REST, and admin | `server/alert/.agent-review` |
+| `server/event_contexts` | Apply alert/device events, create follow-up events/logs, and bootstrap selected unknown devices/codes | `server/event_contexts/.agent-review` |
+| `server/peripheral_devices` | Lock/terminal desired state, passive config, liveness, CUP/SUP schemas, REST, and admin | `server/peripheral_devices/.agent-review` |
+| `server/peripheral_behavior` | Game users/access codes/permissions, terminal accounts, menus, and alert-state availability | `server/peripheral_behavior/.agent-review` |
+| `server/assets` | Audio/video/image/text blobs, game/input settings, storage, REST, and admin | `server/assets/.agent-review` |
+| `server/streams` | Persist/query operational logs and game-stream records | `server/streams/.agent-review` |
+| `server/admin_extended` | Intended operator CSV import of users/access codes; routes currently unreachable | `server/admin_extended/.agent-review` |
+| `server/templates`, `server/static` | Shared custom-admin and HTML/static presentation | relevant owning app review |
+| `server/tests` | Sparse transport/event/worker characterization | nearest area review |
+
+| Process | Entrypoint | Responsibility |
+| --- | --- | --- |
+| `api` | `entrypoint.sh` then Gunicorn or Django runserver | REST, custom admin, schema, health/ops, media route in debug |
+| `worker_mqtt` | `python manage.py start_worker mqtt` | Convert `ask.*` MQTT packets to internal messages and maintain keepalive |
+| `worker_internal` | `python manage.py start_worker internal` | Apply domain contexts, persist logs, and route CUP/SUP/follow-up events |
+| `worker_save` | `python manage.py start_worker state` | Apply supported smart-device SUP state to DB |
+| `worker_send` | `python manage.py start_worker client` | Build/send smart and passive CUP configuration |
+| `scheduler` | `python manage.py start_scheduler` | Create timed alert-counter events using Redis gates |
+| Infrastructure | PostgreSQL, RabbitMQ/MQTT, Redis, Nginx, media volume | persistence, broker transport, scheduler/cache state, ingress/static storage |
+
+## 3. Canonical Flows
+
+### HTTP/operator flow
+
+```text
+REST or custom admin
+  -> serializer/form/model
+  -> PostgreSQL and/or media filesystem
+  -> selected model/admin save hooks publish internal events or MQTT CUP
+  -> HTTP response does not generally confirm downstream delivery
+```
+
+### Device ingress
+
+```text
+ask.<device_type>.<device_uid>.<PONG|CUP|SUP|INFO>
+  -> worker_mqtt
+  -> internal queue
+  -> CUP: worker_send
+     SUP: worker_save
+     INFO: alert/device event contexts
+  -> DB/log/follow-up effects
+  -> source messages usually ACK even after many failures
+```
+
+### Alert and device refresh
+
+```text
+API/admin/scheduler/device event
+  -> AlertState / AlertCounter mutation
+  -> internal alert event
+  -> client_update.<active-topic>.all
+  -> passive topic broadcast or smart-device CUP per row
+```
+
+### Terminal content/access
+
+```text
+assets + game users/codes
+  -> polymorphic menu items / permissions
+  -> terminal accounts and lock ACL
+  -> device REST/CUP projections
+```
+
+### Logging
+
+```text
+worker/context log event
+  -> internal worker
+  -> StreamRecord(stream="log")
+  -> stream REST/admin query
+```
+
+## 4. Contracts
+
+### HTTP/API
+
+- Root API groups are `/api/alert/`, `/api/assets/`, `/api/devices/`, `/api/behavior/`, and `/api/streams/`; admin is `/admin/`; schema/auth/ops live under `/api/` and `/ops/`.
+- Most resources use DRF `ModelViewSet`, exposing full CRUD synchronously.
+- Project config declares token authentication but no default authenticated permission. Most viewsets place broken `DynamicAuthMixin` after `ModelViewSet`; middleware enforcement is commented out. Application-level API access is therefore broadly anonymous unless deployment infrastructure adds protection.
+- Generated `schema.yml` is supporting evidence and contains known serializer/type/auth mismatches; inspect implementation before relying on it.
+
+### Persistence and identity
+
+- PostgreSQL is authoritative for alert, device, behavior, topic, stream, and asset metadata.
+- Models mix integer and UUID primary keys. Preserve existing types and foreign keys during migration.
+- Media bytes live outside DB under `/media`; metadata/blob operations are not transactional and current production serving is uncertain.
+- Redis holds scheduler locks/time gates and Django cache data; it is not authoritative domain storage.
+- `skaben_data.json` is initial/supporting data, not a complete production-state contract.
+
+### Messaging
+
+- External device routing is `<topic>.<uid>.<command>`; inbound MQTT uses `ask.<topic>.<uid>.<command>`.
+- Packet commands include PING/PONG, CUP configuration, SUP reported state, and INFO domain actions.
+- Internal domain events use RabbitMQ headers for type/source and body for data. Event/context code controls ordering of DB, log, and follow-up effects.
+- Publishers catch transport exceptions and return no reliable success result. Several handlers catch broad exceptions and ACK source messages, so retries/dead-letter behavior is mostly absent.
+- MD5 hashes/task IDs are compatibility/change-detection values, not security primitives.
+
+### Runtime and startup
+
+- Each API/worker/scheduler process has independent Python memory; coordination occurs through PostgreSQL, RabbitMQ, Redis, and shared media where mounted.
+- API startup waits nominally for DB, creates cache table, collects static files, generates schema, runs mutating integrity checks, then migrates only outside dev before starting HTTP server.
+- `check_integrity` may repair/create domain rows. Health checks are not purely read-only.
+- Graceful drain, durable outbox, delivery reconciliation, and coordinated shutdown are not established project-wide.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Anonymous HTTP mutation | Most CRUD/ops requests accepted | Explicit authentication, roles, and per-action policy |
+| RabbitMQ/MQTT publish fails | Usually logged and swallowed; caller continues | Observable result, retry, DLQ, and reconciliation |
+| Worker/domain processing raises | Many paths log then ACK, losing event | Typed retry/discard/poison policy |
+| DB succeeds but side effect fails | Partial state with stale client/log/blob | Transactional outbox or compensating workflow |
+| Side effect occurs before rollback | Client/blob may reflect uncommitted state | Post-commit effects and versioned reconciliation |
+| Concurrent state/device/content edit | Last-write/implicit ordering and duplicate effects | Revision/conflict rules, locks where needed, idempotency |
+| Missing/malformed config | Startup, worker, API, or client update can fail inconsistently | Typed validation/readiness with operator diagnostics |
+| Process shutdown during work | No common drain/settlement guarantee | Graceful stop and in-flight settlement policy |
+
+- Concurrency/order: many M2M/queryset projections lack explicit order; database writes and broker/filesystem effects are rarely one atomic unit.
+- Reliability: no project-wide event ID, idempotency key, outbox, retry ledger, DLQ policy, or desired-versus-delivered reconciliation exists.
+- Security/operations: API authorization is the largest shared risk. Public CRUD exposes device state, assets, access data, logs, and destructive cascades; some error responses/logs expose internal details.
+
+## 6. Gaps
+
+- Tests: coverage is sparse and some tests reference stale symbols; critical API, model, worker, scheduler, filesystem, authorization, retry, and integration flows lack characterization.
+- Docs: development/operating docs explain intent but lag code in device synchronization, terminal behavior, media serving, and settlement.
+- Validation: cross-app wire schemas, IDs, ordering, timestamp/hash semantics, deletion cascades, and retry policies need explicit versioned contracts.
+- Operations: health/readiness, migration order, secret handling, graceful shutdown, data retention, backups, and recovery are not consistently defined.
+- Architecture: domain models frequently publish from `save()`, serializers own persistence behavior, transport failures are unobservable, and cross-app imports blur ownership.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| HTTP/Admin adapters | Authenticate, validate commands, return stable DTOs | no domain work hidden in serializers/forms |
+| Domain services | Alert, access, content, and device decisions | transport/filesystem independent; explicit transaction boundary |
+| Repositories | PostgreSQL persistence | preserve IDs/schema compatibility; no external side effects in `save()` |
+| Event/Outbox layer | Record committed follow-up work | versioned events, idempotency, retry/DLQ, observable status |
+| Device transport | MQTT ingress/egress and desired/reported projection | stable routing/wire compatibility; device ACK/reconciliation |
+| Blob storage | Durable asset bytes and URLs | transactional staging/cleanup; backend-independent |
+| Query/Operations | Logs, health, metrics, admin workflows | read-only diagnostics, retention, redaction, actor audit |
+
+## 8. Migration Order
+
+1. Characterize canonical HTTP, alert, MQTT, asset, access, terminal, and logging flows using child reviews and real fixtures.
+2. Secure public endpoints and separate read/write/operator/device DTOs.
+3. Make persistence and external side-effect success/failure observable; stop swallowing delivery outcomes.
+4. Introduce committed event/outbox, retry/DLQ, idempotency, and reconciliation boundaries.
+5. Extract domain services/repositories and remove transport/filesystem work from model saves and serializers.
+6. Stabilize ordering, concurrency, deletion, startup/shutdown, and versioned wire contracts.
+7. Remove legacy/dead behavior only after client, fixture, and deployment compatibility verification.
+
+## 9. Minimum Tests
+
+- API/admin authentication and authorization for every route group and destructive action.
+- Alert success/failure, scheduler transition, and exact device-refresh fanout.
+- PING/PONG/CUP/SUP/INFO routing, validation, settlement, retry, and DLQ behavior.
+- Lock ACL, terminal menu/account, passive config, and wire/hash compatibility.
+- Asset upload/delivery/delete with DB/blob failure compensation.
+- User/code permission, duplicate/concurrent import, and cascade behavior.
+- Stream severity/order/retention and domain log/follow-up partial failures.
+- Transaction rollback versus outbox publish; idempotent replay and reconciliation.
+- Startup readiness, migrations, integrity checks, graceful worker/scheduler shutdown, and recovery.
+
+## 10. Do-Not-Lose
+
+- Existing PostgreSQL primary keys, foreign keys, fixture compatibility, and conventional alert state/order identifiers.
+- MQTT routing `<topic>.<uid>.<command>` and established PING/PONG/CUP/SUP/INFO packet roles.
+- Lock ACL wire shape, passive device payloads, and reviewed terminal/menu/account projections.
+- Alert named-state and counter transition rules, including required device refreshes.
+- Asset UUIDs, content relationships, supported media/input/game data, and client-visible URLs after serving policy is fixed.
+- Game-user/access-code uniqueness and permission/state relationships.
+- Stream message/source/mark/data history and severity semantics.
+- Operator ability to inspect/control system through authenticated API/admin with observable outcomes.
+
+<!-- Child `.agent-review` files contain authoritative area detail. Observed behavior is separate from target behavior. -->

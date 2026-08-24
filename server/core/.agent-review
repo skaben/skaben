@@ -1,0 +1,136 @@
+# AGENT REFERENCE: LEGACY CORE MAP
+
+Reviewed: 2026-08-24
+Scope: `server/core` cross-cutting structure and process boundaries
+Purpose: shared project-structure notes for legacy-core migration reviews
+
+## 0. Agent Rules
+
+1. Treat `server/` as the source of current production behavior.
+2. Do not infer legacy behavior from `app/` or docs alone.
+3. Code is authoritative when it conflicts with `docs/`.
+4. Read this file before area-specific reviews in `server/core/**/.agent-review`.
+5. Preserve explicit contracts; do not preserve accidental failure behavior.
+6. Keep transport, scheduling, domain decisions, persistence, and side
+   effects separate in migrated code.
+7. Treat Django management commands as process boundaries with their own
+   runtime state.
+8. Use tests and docs as supporting evidence after code.
+
+## 1. Project Structure
+
+| Path | Responsibility |
+| --- | --- |
+| `server/core/transport` | RabbitMQ connection config, routing helpers, packet/event DTOs, publishing |
+| `server/core/worker_queue_handlers` | Long-running consumers for MQTT ingress and internal queues |
+| `server/core/scheduler` | Periodic task orchestration over Redis time gates plus transport publishing |
+| `server/core/management/commands` | Process entrypoints such as `start_worker` and `start_scheduler` |
+| `server/core/tasks.py` | Cross-cutting helper that publishes client update fanout messages |
+| `server/event_contexts` | Inline orchestration for alert/device events triggered by workers |
+| `server/alert` | Alert state machine, thresholds, counter transitions, service layer |
+| `server/peripheral_devices` | Device models, MQTT topics, config serialization, device-side events |
+| `server/streams` | Persistence for stream/log side effects from event contexts |
+| `server/tests/test_core` and `server/tests/test_workers` | Characterization coverage for packet parsing and worker behavior |
+| `docs/development/*.md` | Supporting docs that may lag current code |
+
+## 2. Runtime Processes
+
+| Process | Entry command | Primary package |
+| --- | --- | --- |
+| `scheduler` | `python manage.py start_scheduler` | `server/core/scheduler` |
+| `worker_mqtt` | `python manage.py start_worker mqtt` | `server/core/worker_queue_handlers` |
+| `worker_internal` | `python manage.py start_worker internal` | `server/core/worker_queue_handlers` |
+| `worker_save` | `python manage.py start_worker state` | `server/core/worker_queue_handlers` |
+| `worker_send` | `python manage.py start_worker client` | `server/core/worker_queue_handlers` |
+
+Each process initializes its own Python runtime, Redis client access, and
+RabbitMQ-facing objects. Shared behavior is coordinated through broker state,
+database state, and Redis state rather than in-process singletons.
+
+## 3. Reading Order
+
+1. Read this shared core map.
+2. Read the area-specific `.agent-review` for the package you are changing.
+3. Read the matching management command entrypoint.
+4. Read transitive domain dependencies in `event_contexts/`, `alert/`, and
+   `peripheral_devices/`.
+5. Use tests and docs to confirm assumptions, not to replace code reading.
+
+## 4. Remaining Core Ownership
+
+| Path | Responsibility | Main consumers |
+| --- | --- | --- |
+| `models/base.py` | UUID base classes, payload hashes, and persisted device keepalive records | `peripheral_devices` |
+| `models/mqtt.py` | Configurable MQTT topic inventory and saved control reactions | workers, alert contexts, admin, ops API |
+| `models/system.py` | Singleton-like system timing settings; no singleton enforcement exists in this model | scheduler and operational configuration |
+| `tasks.py` | Expands topic groups and sends internal `client_update.<topic>.all` fanout messages | `ops/update-devices/` |
+| `healthcheck.py` | Repair-or-report integration checks for alert state/counter, device topics, and access control | health endpoint and `check_integrity` command |
+| `views.py`, `serializers.py`, `urls.py` | Django REST entrypoints, schema routes, health reporting, and the device-update operation | operators and UI clients |
+| `admin.py` | Dedicated Django admin site and maintenance UI for device topics/control reactions | administrators |
+| `redis_pool.py` | Module-global Redis connection pool constructed from Django settings | scheduler and future core callers |
+| `helpers.py`, `validators.py`, `exceptions.py` | Legacy utility and validation primitives shared across apps | all core-adjacent packages |
+
+`CoreConfig.ready()` eagerly calls `get_mq_config()` during Django application
+startup. Importing or booting Django therefore reaches the transport
+configuration layer before a worker or scheduler command begins its own work.
+
+## 5. Core Data and Side-effect Contracts
+
+1. `DeviceTopic.channel` is the canonical configured device topic. `simple`,
+   `smart`, and `all` are virtual selectors owned by `DeviceTopicManager`, not
+   rows that callers may assume exist in the database.
+2. `update_devices(topics)` validates against configured channels plus those
+   selectors, expands selectors to database topics, removes selectors and
+   duplicates, then publishes one empty internal client-update message per
+   concrete topic. The returned list is unordered because it is built from a
+   `set`.
+3. Device liveness is stored separately in `DeviceKeepalive`. Reading
+   `SkabenDevice.online` creates an initial keepalive row when absent, so this
+   property is not read-only.
+4. `DeviceKeepalive.save()` strips non-alphanumeric MAC separators, while its
+   validator accepts several input formats. Code that queries the model must
+   use the normalized bare value to avoid false `DoesNotExist` results.
+5. `ControlReaction` may have a null `channel`; its `rk` property then formats
+   the object representation of `None`. Migration code should define the
+   intended null-channel routing behavior instead of relying on that output.
+6. The `System` model represents global settings by convention only. Nothing
+   in the model or this package restricts it to one row or establishes which
+   row is authoritative.
+
+## 6. Operations and Security Boundaries
+
+1. `check_integrity` is both a diagnostic and a mutating bootstrap operation:
+   it can create the default access-control user, select an existing alert
+   state, and create an alert counter. Run it only with a database that is
+   allowed to be repaired.
+2. The HTTP health endpoint runs the same checks but always returns HTTP 200;
+   consumers must inspect each module's `ok` and `errors` fields rather than
+   relying on the response status.
+3. `ops/update-devices/` and `ops/healthcheck/` declare no view permissions.
+   Project DRF settings configure authentication but no default permission
+   class, so these routes are publicly callable unless a deployment-level
+   control protects them. `UpdateDeviceView` also returns a traceback in its
+   HTTP 500 response.
+4. `DynamicAuthMixin` exists but is not used by the core views. Its production
+   path returns authentication and permission classes rather than instances,
+   unlike DRF's standard hooks; validate this behavior before adopting it.
+5. `AuthRequiredMiddleware` is installed first but its enforcement code is
+   commented out, so it currently passes every request through.
+6. `wait_for_db` retries recursively with a one-second delay. A long outage can
+   grow the Python call stack instead of using an iterative retry loop.
+
+## 7. Migration and Test Notes
+
+1. The initial migration creates integer `id` primary keys for `DeviceTopic`
+   and `DeviceKeepalive`, while the current model definitions inherit Django's
+   default `AutoField`; `ControlReaction` intentionally uses UUID. Preserve
+   existing database primary-key types during a migration.
+2. `BaseModelUUID` and `BaseModelPolymorphic` are reusable abstractions, but
+   the core models in this package do not currently consume either one.
+3. `get_task_id()` and `get_hash_from()` use MD5. They are legacy identity or
+   change-detection helpers, not suitable security primitives; retain output
+   compatibility only where callers depend on it.
+4. Existing `test_core` coverage characterizes transport events and packets;
+   it does not cover core models, admin, health checks, ops endpoints, Redis
+   pooling, or device-update fanout. Add characterization tests before moving
+   these boundaries.

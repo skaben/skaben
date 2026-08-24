@@ -1,0 +1,434 @@
+# AGENT REFERENCE: PERIPHERAL DEVICES
+
+Reviewed: 2026-08-24
+Scope: `server/peripheral_devices` and direct dependencies
+Purpose: behavior map for preserving device identity, configuration, liveness, and synchronization contracts during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, `server/alert/.agent-review`, `server/event_contexts/.agent-review`, and `server/peripheral_behavior/.agent-review` before changing this area.
+3. Treat model, schema, packet, worker settlement, and database behavior as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
+4. Preserve confirmed MQTT routing, CUP/SUP payloads, lock ACL, liveness, override, and client projection contracts, not stale hashes, false online state, public mutation, or swallowed delivery failures.
+5. Keep device persistence, desired-state projection, reported-state ingestion, liveness, transport publishing, API/admin adapters, and passive-device configuration separate.
+6. Make identity normalization, ordering, concurrency, transactions, retries, settlement, idempotency, destructive cascades, and delivery status explicit.
+
+## 1. Sources
+
+- Primary: `server/peripheral_devices/models/{base,lock,terminal,passive,helpers}.py`, `server/peripheral_devices/serializers/{api,schema}.py`, `server/peripheral_devices/service/{packet_format,passive_config}.py`, and `server/peripheral_devices/{views,urls,admin,events}.py`
+- Persistence evidence: `server/peripheral_devices/migrations/0001_initial.py`
+- API entrypoints: `/api/devices/lock/`, `/api/devices/lock/{id}/`, `/api/devices/terminal/`, `/api/devices/terminal/{id}/`, `/ops/update-devices/`, and custom Django admin
+- Worker entrypoints: `ask.<topic>.<uid>.cup`, `ask.<topic>.<uid>.sup`, `client_update.<topic>.<uid>`, `state_update.<topic>.<uid>`, alert-state fanout, and direct model `save()`
+- Worker dependencies: `server/core/worker_queue_handlers/{ask_mqtt_handler,internal,client_update,state_update}.py` and `server/core/tasks.py`
+- Transport/liveness dependencies: `server/core/models/{base,mqtt}.py`, `server/core/transport/{packets,publish,topics,config}.py`, `server/core/helpers.py`, `server/core/validators.py`, and `server/settings.py`
+- Domain dependencies: `server/alert/{models,service}.py`, `server/peripheral_behavior/models/{access,menu}.py`, `server/peripheral_behavior/serializers/menu.py`, and `server/event_contexts/device/lock_access_context.py`
+- Evidence: generated `schema.yml`, `skaben_data.json`, `server/tests/test_core/test_packets.py`, `docs/development/{addressing,transport}.md`, and `docs/operating/{client_devices,lock,terminal}.md`; no package-specific source tests were found
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `models.base.SkabenDevice` | Abstract smart-device identity, desired-state base, liveness lookup, checksum comparison, and save-triggered CUP publish | lock and terminal models, admin, API |
+| `SkabenDeviceManager` | Filter devices not under override | client-update worker |
+| `models.lock.LockDevice` | Persist lock desired state, project ACL, validate lock CUP/SUP shapes, and calculate checksum | API/admin, client/state-update workers, lock event context |
+| `LockDeviceManager` | Intended bulk close/block operations | dormant `ClientUpdateContext`; methods are currently broken |
+| `models.terminal.TerminalDevice` | Persist terminal flags, project assigned accounts/state map, and calculate checksum | API/admin, client-update worker |
+| `TerminalDeviceManager` | Intended bulk power/block operations | dormant `ClientUpdateContext`; methods are currently broken |
+| `models.passive.PassiveConfig` | Store arbitrary simple-device JSON per topic and alert state | passive config service and admin |
+| `models.helpers.get_model_by_topic` | Map static smart topics `lock` and `terminal` to models | client-update and state-update workers |
+| `serializers.schema` | Pydantic desired/reported smart-device payload schemas | model CUP construction and lock SUP ingestion |
+| `serializers.api` | DRF lock and terminal representations | device viewsets and generated OpenAPI |
+| `service.packet_format` | Construct smart/simple CUP packets | model saves and client-update worker |
+| `service.passive_config` | Resolve current alert-state simple config or derive scale config | client-update worker |
+| `views` / `urls` | Expose model viewsets for locks and terminals | project API router |
+| `admin` | Edit smart devices, lock permissions, terminal assignments, and passive configs | custom `base_site` |
+| `events.DeviceNotFoundEvent` | Declared event type for missing devices | no source caller or consumer found |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| Direct smart-device save | model/API/admin mutation | DB write, checksum comparison, optional immediate MQTT CUP |
+| Client CUP request | `ask.<topic>.<uid>.cup` with client hash | targeted checksum comparison and optional CUP response |
+| Bulk refresh | alert event or `/ops/update-devices/` | `client_update.<topic>.all`, then CUP per eligible smart device or one simple broadcast |
+| Reported-state upload | `ask.<topic>.<uid>.sup` | validated lock fields written with `QuerySet.update()` |
+| Passive projection | current alert state plus topic | stored JSON, or derived scale level/state/borders |
+| Liveness | device packet or `online` property read | shared `DeviceKeepalive` lookup/update/create |
+| Unknown lock registration | targeted update/INFO for missing lock in white state | new lock row and save-triggered CUP |
+| REST CRUD | lock/terminal viewsets | model reads/writes/deletes plus serializer and save side effects |
+
+## 3. Canonical Flows
+
+### Direct smart-device save
+
+```text
+model.save() from API/admin/domain code
+  -> default send_update=True
+  -> write DB row
+  -> calculate current MD5 checksum
+  -> checksum differs from instance-local _prev_hash
+       -> override=true: log and skip publish
+       -> otherwise build CUP
+       -> publish <topic>.<mac_addr>.cup to MQTT exchange
+  -> cache checksum on this Python object
+```
+
+Publishing occurs after the database write but not through `transaction.on_commit()`. Broker errors are swallowed by the transport publisher, so the caller cannot distinguish delivery from loss. A fresh ORM instance falls back to class default `_prev_hash = ""`; its first save therefore publishes even if persisted desired state did not semantically change. The cache is neither persisted nor shared across processes.
+
+The documented `send_update` control is defective. No keyword means true. A truthy `send_update` is popped. `send_update=False` is not popped and reaches Django's `Model.save()`, which rejects the unknown keyword, so callers cannot suppress publication with false.
+
+### Lock CUP projection
+
+```text
+LockDevice
+  -> alert=<current AlertState database ID as string>
+     override, sound, timer, closed, blocked
+     acl={<raw access code>: [<alert-state database IDs>]}
+  -> CUP(config_hash=<lock MD5>, timestamp=<server epoch>)
+  -> lock.<mac_addr>.cup
+```
+
+The lock hash covers `closed`, `blocked`, `sound`, `override`, and the ACL projection. It does not cover `timer` or `alert`, although both are transmitted. It also excludes IP, MAC, description, and timestamp, which are server metadata rather than current lock config. ACL row and state-list ordering have no explicit canonical order, while JSON/checksum construction is order-sensitive.
+
+### Terminal CUP and REST projection
+
+```text
+TerminalDevice.to_mqtt_config()
+  -> inherited base only: {alert, override}
+  -> CUP(config_hash=<terminal MD5>)
+
+Terminal REST serializer
+  -> flags + metadata + hash + alert
+     + accounts[] + account_state_map
+```
+
+`TerminalDeviceSchema` declares `powered` and `blocked` but is unused. Terminal CUP does not contain `powered`, `blocked`, accounts, menu content, or account-state availability. Terminal hash nevertheless covers `powered`, `blocked`, and account hashes, while excluding `alert`, `override`, and the assignment state map. The checksum therefore neither represents the transmitted terminal CUP nor the full REST/runtime projection.
+
+### Client-requested CUP
+
+```text
+ask.<topic>.<uid>.cup
+  -> AskHandler parses timestamp/hash/datahold
+  -> internal.<topic>.<uid>.cup
+  -> client_update.<topic>.<uid>
+  -> require active DeviceTopic
+  -> simple topic: build current passive config and send one CUP
+  -> smart topic: lookup model by static topic
+       -> force_update OR server hash != body.hash: send CUP
+       -> missing lock: optionally create in white state, then send
+  -> ACK/reject source client-update message
+```
+
+Targeted smart handling contains an accidental failure path: overridden or already-current devices return `None` from `get_device_instance()`, but `None` is still placed in the target list. Packet creation dereferences it, the worker logs an error, and rejects the message. A missing terminal also returns `None` because only locks can be bootstrapped, producing the same outcome.
+
+Unknown or inactive topics are acknowledged before the permitted-topic check. The later unknown-topic rejection is effectively unreachable unless configuration changes concurrently. Simple topics with missing/empty config are acknowledged without a CUP. Transport publish success is not observed before ACK.
+
+### Bulk refresh
+
+```text
+alert-state fanout OR POST /ops/update-devices/ {topics:[...]}
+  -> core.tasks.update_devices()
+  -> expand all/simple/smart selectors from DeviceTopic rows
+  -> publish client_update.<topic>.all
+  -> worker checks active topic
+  -> simple: one topic.all.cup
+  -> smart: every model row where override=false, one CUP each
+```
+
+The operations endpoint returns `update_sent` based on selected topic names, not confirmed internal publication, worker processing, MQTT delivery, or device acknowledgement. Publish errors are swallowed. Bulk smart sends are sequential and have no per-device result ledger or retry boundary.
+
+### Lock SUP ingestion
+
+```text
+ask.lock.<uid>.sup {datahold:{closed, blocked?}}
+  -> internal routes datahold to state_update.lock.<uid>
+  -> LockDeviceSaveSchema
+  -> discard fields with value None
+  -> LockDevice.objects.filter(mac_addr=uid).update(...)
+  -> ACK
+```
+
+Under Pydantic v2, `closed: Optional[bool]` without a default is required; `blocked` may be omitted. Extra input fields are ignored by default. `QuerySet.update()` deliberately bypasses `save()` and therefore sends no echo CUP, but it also bypasses model validation, timestamp update, audit, and any domain hook. A missing MAC updates zero rows and is still acknowledged because `filter().update()` never raises `DoesNotExist`.
+
+Terminal is configured as a smart topic but has no `from_mqtt_config()`. A terminal SUP raises `AttributeError` outside the handler's narrow `DoesNotExist` catch. A database smart topic other than lock/terminal raises `ValueError` in the static model helper.
+
+### Liveness
+
+```text
+incoming device packet
+  -> exact DeviceKeepalive.mac_addr lookup
+  -> evaluate online using previously stored timestamp + 60 seconds
+  -> replace stored timestamp with client-provided packet timestamp
+  -> stale/new device: discard original action, request CUP, ACK packet
+
+API/admin reads device.online
+  -> exact DeviceKeepalive lookup
+  -> absent: create keepalive at current server time and return false
+  -> next read within timeout: return true without any device packet
+```
+
+`DeviceKeepalive.mac_addr` is not unique. Duplicate rows make `.get()` fail. Timestamps are client-controlled; a future value can hold a device online. Device model `timestamp`, labeled last response, is separate and is not updated by packet liveness or SUP processing. Exact, unnormalized case is used; fixture evidence includes case variants, an empty address, and `all`.
+
+### Passive configuration
+
+```text
+client_update.<simple-topic>.<uid>
+  -> current AlertState
+  -> topic=scl:
+       {level:<latest counter>, state:<state name>, borders:<3 even divisions>}
+  -> other simple topic:
+       PassiveConfig.get(topic, current state).config
+  -> nonempty dict -> CUP to <topic>.<uid-or-all>.cup
+```
+
+Stored passive JSON is arbitrary and has no topic-specific schema. Missing config logs an error, returns `{}`, and is acknowledged without delivery. `scl` ignores `PassiveConfig` and derives borders as three equal divisions between 1 and maximum ingame threshold, not from every state's persisted threshold. If no alert counter exists, the read path creates one and its model save publishes an alert event.
+
+### Admin mutation
+
+```text
+save lock/terminal form
+  -> parent saved once by ModelAdmin -> possible CUP using old inline state
+  -> save Permission/TerminalMenuSet inline
+  -> DeviceAdmin.save_formset() re-saves parent
+  -> possible second CUP using new inline state
+```
+
+Lock inline ACL changes affect the lock checksum and normally trigger the second CUP. Terminal assignment state-only changes do not affect terminal checksum and can be missed. Passive-config edits do not schedule simple-device refresh. Deletion has no device reconciliation path.
+
+## 4. Contracts
+
+### Smart-device identity and base state
+
+- Lock and terminal use integer primary keys. `mac_addr` is unique within each concrete table, not globally across device types.
+- MAC storage allows at most 12 characters. `mac_validator` parses a MAC and lowercases only a local variable; it does not normalize the stored value.
+- Model `save()` does not call `full_clean()`, so direct creates can bypass MAC validation. Lookups, routing, and keepalive joins use exact stored/input strings.
+- `ip` is nullable IPv4/IPv6, description is at most 128 characters, timestamp defaults to server epoch seconds, and override defaults false.
+- `topic` is a model property: `lock` or `terminal`. Static helper mapping supports only those two smart topics.
+- `alert` is the current alert-state database ID converted to string. Missing or multiple current states raise through `AlertState.objects.get_current()`.
+- `online` is derived from the separate shared `DeviceKeepalive` table, not device timestamp.
+- `override=true` prevents direct model-save publishing and excludes a device from bulk refresh. It does not prevent REST mutation or lock SUP updates.
+- Deleting a lock cascades behavior `Permission` rows; deleting a terminal cascades `TerminalMenuSet` rows. Keepalive records have no FK and remain orphaned.
+
+### Save/update side effect
+
+- Ordinary `save()` attempts a CUP by default after persistence when current checksum differs from the Python object's cached checksum.
+- Cache starts as a class-level empty string and becomes an instance attribute after save. It is not a persisted device revision.
+- Override skip still records the current checksum on that object, even though no packet was sent.
+- Packet/config validation errors may occur after DB persistence. Packet helpers catch only Pydantic `ValidationError`; other config/query errors propagate.
+- If a helper catches validation and returns `None`, `send_mqtt(None)` dereferences the missing packet and raises.
+- Broker publish catches every exception and returns no delivery result. Save then records checksum as though delivery succeeded.
+- Side effect is not transaction-aware; a packet may be sent for a transaction that later rolls back.
+
+### Lock desired and reported state
+
+- Persistent desired fields are boolean `sound`, `closed`, `blocked`, and signed integer `timer` with default 10. No validator rejects a negative timer.
+- Lock MQTT datahold fields are exactly `alert`, `override`, `sound`, `timer`, `closed`, `blocked`, and `acl`.
+- ACL wire shape is `{<access-code string>: [<AlertState integer primary keys>]}`. Empty permission state lists are valid current data.
+- Lock checksum is MD5 over a JSON object containing `closed`, `blocked`, `sound`, `override`, and `permissions`; timer and alert are omitted.
+- Lock SUP accepts required nullable `closed` and optional nullable `blocked`; null values are removed before update.
+- Lock SUP does not accept timer, sound, override, ACL, alert, or metadata as persisted reported fields; extra fields are silently ignored.
+- Intended bulk manager methods call `self.objects.all()` on a manager instance rather than `self.get_queryset()`, so current calls raise `AttributeError`.
+
+### Terminal desired and projected state
+
+- Persistent desired fields are booleans `powered` and `blocked`, both default false.
+- Terminal account list comes from `TerminalMenuSet` rows with no explicit order or unique terminal/account constraint.
+- `account_state_map` keys are account UUID strings and values are unordered alert-state ID lists. Duplicate assignment rows overwrite by UUID while account output can contain duplicates.
+- `account_set_list` is annotated `List[int]` but returns account MD5 strings.
+- Terminal checksum covers powered, blocked, and account hashes in assignment queryset order. It omits override, alert, account-state map, terminal metadata, and owning user IDs excluded by account hashes.
+- Terminal MQTT datahold currently contains only inherited `alert` and `override`. `TerminalDeviceSchema(powered, blocked)` has no source consumer.
+- Terminal has no reported-state parser, so terminal SUP is unsupported despite being classified smart.
+- Intended bulk manager methods use the same broken `self.objects.all()` pattern as lock manager methods.
+
+### Passive config
+
+- Static simple topic choices are `box`, `rgb`, `scl`, and `pwr`, computed at module import from code rather than `DeviceTopic` rows.
+- `topic` is a `CharField` without a declared maximum length. Validate Django/backend portability and establish a compatible bound.
+- `config` is arbitrary JSON with default `{}`; no schema ties shape to topic.
+- `state` is nullable/blank and protected from deletion. The worker only looks up a non-null current state.
+- Database uniqueness is `(state, topic)`. PostgreSQL-style NULL uniqueness permits multiple null-state rows for one topic.
+- Admin `get_state_name()` dereferences `obj.state.name`; a permitted null-state row breaks that list column.
+- Editing or deleting passive configs does not publish refresh work.
+- Fixture evidence defines `pwr` payloads with uppercase `AUX`, `OFF`, and `PWR`, one inactive `box` example, and `rgb` program strings. These are data contracts, not model validation.
+
+### CUP packet construction
+
+- Smart routing key is `<topic>.<mac_addr>.cup`; simple routing is `<topic>.<provided uid or all>.cup`.
+- Encoded CUP body is a JSON string containing server `timestamp`, `datahold`, and smart `config_hash`; optional null fields are omitted.
+- Simple CUP omits `config_hash` because helper does not provide one.
+- Smart `config_hash` is `model.get_hash()`, even where checksum inputs differ from transmitted datahold.
+- Helpers return `None` only for Pydantic validation errors after logging; callers do not safely handle `None`.
+- Transport encoding, possible double JSON serialization, and publisher failure behavior are documented in `server/core/transport/.agent-review`.
+
+### Client-update worker
+
+- Routing is `client_update.<topic>[.<uid>]`; nonmatching marker is requeued, malformed arity handling is incomplete, and inactive/unknown topics are acknowledged.
+- Topic classification and activity come from `DeviceTopic` rows. Smart model selection remains static lock/terminal code.
+- Simple updates use current alert state and are broadcast to `all` unless a UID is supplied.
+- Bulk smart updates exclude override rows and send every remaining row without comparing hashes.
+- Targeted smart updates compare client body field `hash` to server checksum unless header `force_update` is truthy.
+- Only a missing lock may be bootstrapped, and only under white-state policy. Creation performs a save-triggered CUP before worker later attempts another CUP.
+- Worker has no device ACK correlation, retry counter, deduplication, delivery ledger, or per-target bulk result.
+- Exceptions in the main processing block produce an internal log request and reject without requeue by default.
+
+### State-update worker
+
+- Routing must be exactly `state_update.<topic>.<uid>`.
+- Topic must be classified smart in `DeviceTopic`; active flag is not checked.
+- Model lookup supports only lock and terminal.
+- Successful lock validation uses one `QuerySet.update()` and ACKs without checking affected row count.
+- Catching `model.DoesNotExist` is ineffective for `filter().update()` and does not cover schema, helper, terminal-method, or database errors.
+- `DeviceNotFoundEvent` exists but the worker TODO never emits it.
+
+### Liveness
+
+- `DeviceKeepalive` has integer ID, MAC string up to 32, positive integer timestamp, and no uniqueness constraint.
+- Online rule is strict `timestamp + DEVICE_KEEPALIVE_TIMEOUT > server time`; configured timeout is 60 seconds.
+- Ask ingress evaluates the old stored timestamp before replacing it with the incoming client-supplied timestamp.
+- New/expired device packets are acknowledged after dispatching a CUP request; original CUP/SUP/INFO action is discarded.
+- Reading a smart device's `online` property creates missing keepalive state at current server time and returns false, allowing the next read to report a never-seen device online.
+- Device table timestamp and keepalive timestamp are independent. Current code does not maintain the device field as last response despite its label/docs.
+
+### REST API
+
+- Router base is `/api/devices/`; lock and terminal viewsets expose list, retrieve, create, update, partial update, and destroy.
+- `DynamicAuthMixin` is listed after `ModelViewSet`, so DRF/APIView authentication and permission methods win in method resolution and the mixin is not used.
+- Even if reordered, both mixin methods require a `request` argument although DRF calls them without one, and non-dev branches return `TokenAuthentication` and `IsAuthenticated` classes rather than instances. The mixin remains incompatible until both signatures and return values are fixed.
+- Project default has token authentication but no default permission class, so anonymous requests are allowed. Development settings also explicitly remove authentication/permissions. Generated OpenAPI has no endpoint security declaration.
+- Lock API emits ID, topic, hash, alert, online, ACL, IP, MAC, description, timestamp, override, sound, closed, blocked, and timer. MAC and timestamp are read-only.
+- Lock create cannot accept required identity through the serializer. Model construction can fall back to an empty string because model save does not validate, yielding an invalid/unique-empty identity and routing key.
+- Generated schema incorrectly types ACL as a string although runtime value is a dictionary.
+- Terminal API emits the base declared fields except `online`, plus accounts, account-state map, IP/MAC/description/timestamp/override/powered/blocked.
+- Terminal `accounts` is explicitly declared without `read_only=True`; generated schema marks it required/writable. Default model serializer cannot perform this nested write to method source `get_related_accounts`, making normal create/full update incompatible.
+- Terminal nested accounts expose plaintext game passwords and inherit menu serializer defects documented in `server/peripheral_behavior/.agent-review`.
+- Generated schema incorrectly types `account_state_map` as string. No filtering, pagination, optimistic concurrency, audit, rate limit, or object policy exists locally.
+- `/ops/update-devices/` has no explicit auth/permission class and is likewise anonymously callable under current defaults.
+
+### Admin
+
+- Smart device identity, desired fields, override, and metadata are editable; timestamp, alert, and online are read-only.
+- Viewing smart-device admin lists/details evaluates `online` and can create/alter apparent liveness state.
+- Lock permissions and terminal assignments are owned as device inlines.
+- `save_formset()` saves inline changes and then re-saves the parent to trigger checksum/publish behavior.
+- Parent and inline save phases are not one durable device-projection operation and can emit old then new projections.
+- Passive configs expose topic/state/config/comment but no typed validation or automatic refresh.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Anonymous device CRUD/update request | Full smart-device mutation/deletion and bulk refresh are allowed | Require explicit operator/device roles and action/object policy |
+| `save(send_update=False)` | Unknown keyword reaches Django save and raises | Pop explicit boolean and separate persistence from refresh command |
+| Fresh ORM instance saved unchanged | Empty process-local cache causes CUP attempt | Compare persisted canonical revision or emit only from explicit committed command |
+| DB transaction later rolls back | CUP may already have been sent | Durable post-commit outbox |
+| MQTT publish fails | Error logged/swallowed; save/update reported successful and checksum cached | Observable delivery state, retry, DLQ, and reconciliation |
+| Packet schema validation returns `None` | Caller dereferences `None`; DB may already be changed | Typed construction failure before persistence/settlement |
+| Lock timer or alert changes | Transmitted config changes but checksum does not | Canonical revision covers every transmitted/runtime field |
+| ACL/query ordering changes | Same policy may hash differently or output order drifts | Sort codes and state IDs before projection/hash |
+| Targeted CUP for current device | `None` target dereferenced; message logged and rejected | Treat no-update as successful no-op ACK |
+| Targeted CUP for overridden device | Same `None` failure and reject | Explicit policy skip with observable reason and ACK |
+| Missing terminal CUP | No bootstrap; `None` failure and reject | Typed not-found result/event with registration policy |
+| Missing lock outside white state | Creation refuses, later lookup fails, message rejects | Typed refusal outcome without dereference; explicit retry/discard policy |
+| Concurrent missing-lock creation | Unique MAC race and partial publish/log outcomes | Transactional idempotent registration by normalized identity |
+| Smart bulk partially fails | Earlier devices may be sent; whole message rejects without per-device ledger | Per-device idempotent jobs/results and targeted retries |
+| Unknown/inactive client-update topic | Silently acknowledged | Explicit inactive discard metric; unknown quarantine/reject policy |
+| Missing passive config | Logs then ACKs without sending; client stays stale | Explicit incomplete-config state, alerting, and retry/reconciliation policy |
+| Malformed passive JSON for device | Stored and sent without topic schema validation | Versioned per-topic schema at write and projection boundaries |
+| Null passive state in admin | List rendering dereferences null | Disallow null or render/define fallback semantics |
+| Duplicate null-state passive configs | Database unique pair does not prevent them | Partial unique constraint or forbid null state |
+| Passive config edited | No device refresh | Durable affected-topic refresh after commit |
+| Terminal powered/blocked changes | Hash changes and CUP sends, but CUP omits both values | Define terminal device wire DTO and include desired fields |
+| Terminal account-state assignment changes | Hash may not change; refresh can be skipped | Include canonical state map in terminal revision/projection |
+| Terminal SUP | Missing parser raises outside handler catch | Implement validated reported-state DTO or reject unsupported command explicitly |
+| Lock SUP for unknown MAC | Zero rows updated, then ACK | Check row count and emit typed not-found outcome |
+| Lock SUP omits `closed` | Pydantic v2 validation failure escapes narrow catch | Match optionality to wire contract and settle validation failures explicitly |
+| Bulk manager operation | `self.objects` on manager raises `AttributeError` | Use queryset/service and characterize atomic/partial behavior |
+| Duplicate keepalive rows | Exact `.get()` raises `MultipleObjectsReturned` | Unique normalized identity and duplicate-data migration |
+| Read `online` for unseen device | Creates current keepalive; next read reports false-positive online | Make liveness read-only; update only from authenticated packet receipt |
+| Future client timestamp | Device may remain online artificially | Validate clock skew or store server receive time separately |
+| Device MAC case/format differs | Exact lookup misses; parallel identities/keepalives possible | Canonical normalization at every ingress and DB constraint |
+| API creates lock | MAC is read-only; omitted model value can become empty identity | Explicit validated registration command requiring canonical MAC |
+| Terminal API writes accounts | Required writable nested method field cannot be persisted | Read-only projection plus explicit assignment commands |
+| Device deletion | Behavior rows cascade while keepalive remains; no client cleanup | Impact preview, transaction, tombstone/offline command, audit, reconciliation |
+
+- Concurrency/order: device identity is only unique per smart table, keepalive identity is nonunique, ACL/account/state ordering is implicit, registration can race, and bulk manager/admin loops have partial-effect behavior.
+- Reliability: checksum is an in-process comparison hint rather than durable revision. No outbox, delivery receipt, device ACK correlation, retry count, deduplication key, DLQ policy, stale-device reconciler, or desired/reported revision ledger exists.
+- Security/operations: device CRUD, desired-state mutation, override, deletion, game credentials, ACL projections, and bulk refresh are exposed anonymously under current API behavior. MAC/timestamp inputs are not authenticated as device identity.
+
+## 6. Gaps
+
+- Tests: no package tests cover save-triggered publishing, `send_update`, override, hashes, ACL ordering, terminal CUP, passive config, serializers, authorization, liveness, registration, SUP, worker settlement, or cascades.
+- Tests: generic CUP test covers only routing/body encoding without smart `config_hash`, device models, validation failure, or publisher behavior.
+- Docs: operating docs promise terminal content/state and describe device timestamp updates, but implementation sends terminal base config only and maintains liveness in a separate table.
+- Docs: addressing docs say direct admin changes may require manual synchronization, while current model saves publish by default; characterize deployed behavior before treating either as contract.
+- Validation: define canonical MAC format/case, server/client clock-skew policy, timer range, passive per-topic schemas, null passive-state semantics, SUP optional fields, and terminal reported state.
+- Validation: confirm client expectation for CUP JSON/string encoding, `config_hash` versus inbound `hash`, merge versus overwrite, alert database IDs, ACL/state ordering, and simple-device missing-config behavior.
+- Validation: `PassiveConfig.topic` has no maximum length; verify framework/backend checks and migrate to an explicit compatible bound.
+- Defects: auth mixin is shadowed by inheritance order and would return classes instead of instances if activated.
+- Defects: terminal API nested writes, lock API registration, ACL/account-map OpenAPI types, terminal online omission, and plaintext nested password exposure make generated contract unsafe/inaccurate.
+- Defects: terminal desired schema is unused; terminal SUP is unsupported; DeviceNotFoundEvent is dormant; bulk managers call nonexistent manager `objects` attribute.
+- Defects: hashes omit transmitted/runtime fields and include terminal fields absent from CUP; targeted no-op/override/missing paths dereference `None`.
+- Defects: liveness reads mutate state, keepalive identity is nonunique, packet time is client-controlled, and device timestamp is stale.
+- Evidence: fixture contains five locks, no terminals, eleven passive configs, five configured topics with terminal absent and box inactive, and twenty-two keepalive rows. It is supporting evidence only and was already modified at review time.
+- Verification: Django runtime checks could not run in the current workspace because the existing virtual environment lacks `rest_framework`; static artifact checks remain available.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `DeviceIdentity` / `DeviceRepository` | Normalize and persist topic-scoped smart-device identity and metadata | canonical MAC, unique constraint, legacy mapping, no publish in repository save |
+| `DeviceLivenessService` | Record authenticated packet receipt and query online state | server receive time, unique identity, read-only queries, clock-skew policy |
+| `LockDesiredStateService` | Own lock flags, timer, override, and ACL policy | validated timer, canonical ACL order, transaction and authorization |
+| `TerminalDesiredStateService` | Own terminal flags and behavior assignments | explicit account/state order and complete runtime projection |
+| `PassiveConfigRepository` | Own versioned simple-topic configuration per alert state | typed topic schema, non-null state or explicit fallback, unique key |
+| `DeviceProjectionBuilder` | Build canonical lock/terminal/simple wire DTO and revision | revision covers all transmitted fields; stable order; schema version |
+| `ReportedStateService` | Validate and apply SUP without triggering desired-state echo | supported topic DTOs, affected-row check, audit, device auth |
+| `DeviceRefreshOutbox` | Persist post-commit desired-state delivery work | per-device idempotency, retry/DLQ, bulk fanout, observable status |
+| `DeviceDeliveryWorker` | Publish CUP and record attempts/results | no `None` targets, explicit no-op/override/not-found outcomes, reconciliation |
+| `DeviceRegistrationService` | Register unknown devices under explicit policy | normalized identity, atomic get/create, management-state rule, audit |
+| `DeviceApi` | Authorized read projections and explicit mutation commands | separate registration/update/delete DTOs, optimistic revision, accurate schema |
+| `DeviceAdminAdapter` | Human operations over the same services | impact preview, actor audit, one committed projection/refresh per change |
+
+## 8. Migration Order
+
+1. Characterize deployed lock CUP, inbound SUP, client hash, MAC normalization, liveness, override, API, admin, and worker settlement behavior with real-client fixtures.
+2. Lock down device and bulk-update endpoints; split device/operator read and write DTOs; stop exposing plaintext terminal credentials broadly.
+3. Make liveness reads side-effect free, add normalized unique keepalive identity, migrate duplicates/case variants, and store server receive time.
+4. Define versioned canonical lock, terminal, and passive projections; include every transmitted/runtime field and stable ACL/account/state ordering in revisions.
+5. Repair API registration/nested fields/schema, manager methods, targeted no-op handling, SUP validation/row-count handling, and typed missing-device outcomes.
+6. Separate repository persistence from refresh; add durable post-commit outbox and per-device delivery attempt/result records.
+7. Add terminal desired/reported wire support or explicitly remove unsupported commands after client verification.
+8. Add typed passive schemas, non-null/fallback state policy, uniqueness, and automatic affected-topic refresh.
+9. Move API, admin, alert fanout, registration, and workers onto shared services with authorization, audit, retry/DLQ, and reconciliation.
+10. Remove process-local hash suppression, save-triggered publishing, legacy malformed endpoints, and dead event/schema code only after compatibility verification.
+
+## 9. Minimum Tests
+
+- Normalize/validate accepted MAC formats and reject empty, malformed, duplicate, case-variant, and cross-ingress inconsistent identities.
+- Liveness packet receipt uses server time, reads never create rows, duplicate migration is deterministic, and timeout boundary is exact.
+- Lock projection emits exact `alert/override/sound/timer/closed/blocked/acl` datahold with canonical code/state order and compatible IDs.
+- Terminal projection emits the chosen complete wire DTO; powered, blocked, override, alert, accounts, menus, and state-map changes update revision exactly once.
+- Passive `rgb`, `pwr`, `box`, and derived `scl` success paths; missing config, malformed schema, null state, duplicate row, and missing alert/counter behavior.
+- Model/repository persistence rollback sends nothing; commit creates one outbox item; publish failure retries and reaches DLQ/reconciliation policy.
+- `send_update=False`, unchanged state, override, force update, same hash, different hash, missing lock, missing terminal, and concurrent registration.
+- Bulk refresh handles mixed success per device without resending successful targets and reports confirmed versus requested outcomes.
+- Lock SUP success, optional fields, extra fields, invalid types, unknown MAC, inactive/unknown topic, and no desired-state echo.
+- Terminal SUP either validates supported fields or produces explicit unsupported-command settlement without worker crash.
+- Anonymous/invalid-token/device/operator/admin authorization for list/read/register/mutate/override/delete/bulk refresh and nested credentials/ACL.
+- Lock and terminal API create/update/partial update/delete use explicit DTOs, accurate OpenAPI types, optimistic conflict handling, and reviewed cascades.
+- Admin parent plus inline edit creates one canonical post-commit refresh containing final ACL/account-state data.
+- Existing lock/simple/terminal clients accept routing keys, CUP JSON encoding, `config_hash`, inbound `hash`, alert IDs, merge behavior, and payload schema.
+
+## 10. Do-Not-Lose
+
+- Topic-plus-device UID MQTT addressing: `<topic>.<uid>.<command>`, with broadcast UID `all`.
+- Existing persisted lock/terminal integer IDs, MAC identities, IP/description metadata, and reviewed override semantics.
+- CUP server timestamp/datahold shape and smart `config_hash` compatibility; inbound client comparison field `hash` until protocol migration is verified.
+- Lock datahold fields `alert`, `override`, `sound`, `timer`, `closed`, `blocked`, and ACL map `{access_code: [alert_state_database_ids]}`.
+- Lock reported-state ability to persist client `closed`/`blocked` without an outgoing echo loop.
+- Terminal powered/blocked intent, account/menu projection, account-state availability, and client-compatible game behavior once authoritative transport is confirmed.
+- Passive `pwr` values and `rgb` program payloads from reviewed data, plus derived scale fields `level`, `state`, and `borders` where clients depend on them.
+- Active-topic and override skip policies after their exact discard/reporting semantics are made explicit.
+- Unknown-lock creation only under reviewed management/white-state policy, without duplicate registration or implicit access grants.
+- Online timeout behavior based on trustworthy receive time, without reads creating false liveness.
+- Required, observable affected-device refresh after committed desired-state, ACL, assignment, account/menu, asset, alert, or passive-config changes.
+
+<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->

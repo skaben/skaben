@@ -1,0 +1,208 @@
+# AGENT REFERENCE: LEGACY SCHEDULER
+
+Reviewed: 2026-08-24
+Scope: `server/core/scheduler` and direct dependencies
+Purpose: behavior map for migration into the modern Django template
+
+## 0. Agent Rules
+
+1. Read `server/core/.agent-review` first.
+2. Treat `server/core/scheduler` as the source of current scheduler behavior.
+3. Read `server/core/transport/.agent-review` with this file because scheduler
+   tasks publish through the transport layer.
+4. Preserve task cadence and routing only after characterization tests confirm
+   them.
+5. Do not preserve swallowed publish failures, startup Redis wipes, or stale
+   one-shot task records as desired behavior.
+6. Keep schedule calculation, task selection, transport publishing, and domain
+   logic separate in migrated code.
+7. A scheduler task should surface success/failure to the caller.
+8. Startup-only orchestration should remain explicit rather than hiding inside
+   generic recurring-task machinery.
+
+## 1. Files to Read
+
+Primary:
+
+- `server/core/scheduler/service.py`
+- `server/core/scheduler/tasks.py`
+- `server/core/scheduler/types.py`
+- `server/core/management/commands/start_scheduler.py`
+
+Direct task dependencies:
+
+- `server/core/tasks.py`
+- `server/core/models/mqtt.py`
+- `server/event_contexts/alert/tasks.py`
+
+Transport/runtime dependencies:
+
+- `server/core/transport/config.py`
+- `server/core/transport/publish.py`
+- `server/core/transport/.agent-review`
+- `server/core/redis_pool.py`
+- `server/core/helpers.py`
+- `server/settings.py`
+
+## 2. Current Process Model
+
+| Process | Entry command | Runtime shape |
+| --- | --- | --- |
+| `scheduler` | `python manage.py start_scheduler` | single-threaded polling loop with synchronous ORM, Redis, and RabbitMQ calls |
+
+Startup path:
+
+1. `start_scheduler` calls `get_service()`.
+2. `get_service()` creates three task instances:
+   `PingerTask`, `AlertTask`, and `UpdateDevicesOnStartTask`.
+3. `SchedulerService.__init__()` creates a Redis client, stores the initial
+   task list, and deletes Redis hash key `scheduler`.
+4. `service.start()` sets `running = True` and enters `run()`.
+5. `run()` executes every initial task once immediately, stores the returned
+   timeout for each task, then enters a `while self.running` polling loop.
+
+Important process facts:
+
+- Polling interval defaults to 1 second.
+- The command catches `KeyboardInterrupt` and generic `Exception`, then exits.
+- There is no signal handling, graceful drain, or persisted leadership lock.
+- All task execution is inline and blocking.
+
+## 3. Redis Scheduling Contract
+
+Redis key:
+
+- Hash name: `scheduler`
+- Field: `task.name`
+- Value JSON shape:
+  `{"timeout": <int>, "run_after": <unix-seconds>, "requeue": <0-or-1>}`
+
+`put(task, timeout)` behavior:
+
+- Stores the next timeout and absolute `run_after`.
+- Converts `requeue` bool into integer `0` or `1`.
+- Never deletes expired or completed entries.
+
+`get(name)` behavior:
+
+1. Reads the task record from Redis hash `scheduler`.
+2. Returns `None` if the field is absent.
+3. Returns `None` if `run_after` is still in the future.
+4. Reconstructs a new task instance from `task_dispatcher`.
+5. Returns `None` if the task name is not present in `task_dispatcher`.
+
+Critical scheduler mechanics:
+
+- `task_dispatcher` only contains `pinger_task` and `alert_changer_task`.
+- `update_device_task` is run at startup only and can never be reloaded from
+  Redis because it is not in `task_dispatcher`.
+- The polling loop iterates `task_dispatcher.keys()`, not Redis contents.
+- A due task with `requeue=False` is not removed from Redis. If such a task is
+  also present in `task_dispatcher`, it would run every poll forever after its
+  first due time.
+- Every scheduler process deletes the shared `scheduler` hash at startup, so
+  concurrent or restarted schedulers wipe each other's scheduled state.
+
+## 4. Task Catalog
+
+| Task | Name | When it runs | Main effect |
+| --- | --- | --- | --- |
+| `PingerTask` | `pinger_task` | startup + recurring | send `PING` packet to every active device topic |
+| `AlertTask` | `alert_changer_task` | startup + recurring | compute auto alert event and publish it when needed |
+| `UpdateDevicesOnStartTask` | `update_device_task` | startup only | fan out client update requests for all devices |
+
+Task timeout sources:
+
+- `PingerTask`: `settings.RESPONSE_TIMEOUT["ping"]`, default fallback `10`
+- `AlertTask`: `settings.SCHEDULER_TASK_TIMEOUT`
+- `UpdateDevicesOnStartTask`: hard-coded `0`
+
+## 5. Task Contracts
+
+### 5.1 `PingerTask`
+
+Input/state:
+
+- Reads active MQTT topics via `DeviceTopic.objects.get_topics_active()`.
+- Builds a `PING(topic=topic)` packet per active topic.
+
+Behavior:
+
+1. Opens `get_interface()` publisher context.
+2. Iterates every active topic synchronously.
+3. Calls `publisher.send_mqtt(packet)` for each topic.
+4. Returns its configured timeout unchanged.
+
+Critical consequences:
+
+- Publishing uses the transport path documented in
+  `server/core/transport/.agent-review`, including the uninitialized exchange
+  defect from `get_interface()` and swallowed publish failures.
+- The task reports success to the scheduler even if every publish failed.
+- No batching, pacing, timeout budget, or partial-failure reporting exists.
+
+### 5.2 `AlertTask`
+
+Input/state:
+
+- Calls `create_alert_auto_event()` in `server/event_contexts/alert/tasks.py`.
+- That helper opens `AlertService(init_by="scheduler")`, inspects current
+  alert state/counter, and decides whether to emit an `AlertCounterEvent`.
+
+Behavior:
+
+1. Compute `(event, timeout)` from `create_alert_auto_event()`.
+2. If `event` is not `None`, publish it with `publisher.send_event(event)`.
+3. Return the computed timeout.
+
+Decision rules from `create_alert_auto_event()`:
+
+- Returns `(None, settings.SCHEDULER_TASK_TIMEOUT)` when current state or
+  expected state is missing.
+- Returns `(None, settings.SCHEDULER_TASK_TIMEOUT)` when automatic alerting is
+  disabled by `auto_level == 0` or `auto_timeout == 0`.
+- Can emit increase or decrease events, or a `set` operation when crossing
+  alert-state thresholds with a hard-coded dampener of `30`.
+- Raises `ValueError` if `auto_change` is misconfigured.
+
+Critical consequences:
+
+- Publish failures are swallowed by the transport layer, so the scheduler
+  cannot tell whether the alert event was delivered.
+- A misconfigured alert state can raise out of the task and stop the entire
+  scheduler process.
+- The next run interval is domain-controlled by `state.auto_timeout`, not a
+  fixed scheduler-side cadence.
+
+### 5.3 `UpdateDevicesOnStartTask`
+
+Behavior:
+
+1. Calls `update_devices(["all"])`.
+2. `update_devices()` expands special topic selectors into concrete device
+   channels.
+3. For each resulting topic it publishes an internal routing key
+   `client_update.<topic>.all`.
+4. Returns `0`.
+
+Critical consequences:
+
+- This task is intended as startup-only orchestration.
+- It still writes a Redis record during initial scheduling, but that record is
+  ignored forever because `update_device_task` is not in `task_dispatcher`.
+- Publishing uses `publisher.config.exchanges.get("internal")`, which is part
+  of the same uninitialized-exchange defect path documented by transport.
+
+## 6. Failure and Concurrency Risks
+
+1. Scheduler state is not durable across restarts because startup deletes the
+   shared Redis hash.
+2. Multiple scheduler processes can double-run startup work and recurring work;
+   there is no lock, lease, or leader election.
+3. Non-Redis task exceptions bubble out of the loop and terminate the process.
+4. Redis connection failures are logged and retried on the next poll, but no
+   backoff or health transition exists.
+5. Synchronous ORM and publish calls mean one slow task delays every other
+   scheduled task.
+6. Task success is inferred from "method returned" rather than confirmed side
+   effects.

@@ -1,0 +1,284 @@
+# AGENT REFERENCE: ASSETS
+
+Reviewed: 2026-08-24
+Scope: `server/assets` and direct dependencies
+Purpose: behavior map for preserving asset, game-setting, and user-input contracts during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Treat `server/assets`, current storage paths, API serializers, and direct consumers as authoritative; use generated schema and deployment configuration as supporting evidence.
+3. Preserve confirmed identifiers, media formats, and menu payloads, not public mutation, broken upload behavior, unsafe overwrite semantics, or orphaned files.
+4. Keep HTTP transport, file validation, metadata persistence, blob storage, URL generation, and downstream menu delivery separate.
+5. Make authorization, content validation, size limits, overwrite/delete policy, transaction boundaries, and cache identity explicit.
+
+## 1. Sources
+
+- Primary: `server/assets/models/{files,games,input}.py`, `server/assets/serializers.py`, `server/assets/views.py`, `server/assets/urls.py`, `server/assets/storages.py`, `server/assets/validators/{asset_validators,file_validator}.py`, and `server/assets/admin.py`
+- Persistence: `server/assets/migrations/0001_initial.py` and `server/core/models/base.py`
+- Entrypoints: `/api/assets/` DRF router, custom Django admin at `/admin/`, and media requests under `/media`
+- Direct consumers: `server/peripheral_behavior/models/menu.py`, `server/peripheral_behavior/serializers/menu.py`, `server/peripheral_behavior/admin.py`, and `server/peripheral_devices/serializers/api.py`
+- Runtime/deployment dependencies: `server/core/urls.py`, `server/core/views.py`, `server/core/helpers.py`, `server/settings.py`, `docker-compose.yml`, and `docker/nginx/conf.d/default.conf`
+- Evidence: `schema.yml`. No source tests, fixtures, or asset-specific documentation cover this package.
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `models.files.SkabenFile` | Shared UUID/name/hash behavior and filesystem URI | binary/text asset models, menu hashing/serialization |
+| `AudioFile`, `VideoFile`, `ImageFile` | Persist uploaded binary metadata and storage name | admin, asset API, menu items |
+| `TextFile` | Persist editable text and generate a `.txt` blob on every save | admin, asset API, text menu items |
+| `models.games.HackGame` | Persist Fallout-style game parameters | asset API; no source-code domain consumer found |
+| `models.input.UserInput` | Persist action, expected response, and UI delay | asset API, user-input menu items |
+| `storages.OverwriteStorage` | Hard-coded local filesystem storage with delete-before-save replacement | all file models and migrations |
+| `validators.FileValidator` | Validate filename-derived extension/MIME and byte length | binary model fields during form/serializer validation |
+| `serializers.FileSerializer` | Return absolute filesystem-path-derived URL and writable name | audio/video/image API and nested menu output |
+| `views.*ViewSet` | Expose full CRUD for six concrete models | HTTP clients and operator UI |
+| `peripheral_behavior.MenuItem*` | Reference assets and incorporate asset hash into menu/account hashes | terminal API/configuration consumers |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| Binary admin upload | authenticated custom admin form | validate upload, save blob, insert/update metadata |
+| Binary API CRUD | `/api/assets/{audiofile|videofile|imagefile}/` | list/retrieve metadata URL; create/update upload contract is broken |
+| Text admin edit | authenticated custom admin form | render content into UTF-8 text blob, then persist metadata |
+| Text API CRUD | `/api/assets/textfile/` | only `name` and `file` exposed; hidden ident/content get empty values on create |
+| Game/input CRUD | `/api/assets/{hackgame|userinput}/` | synchronous ORM CRUD |
+| Menu serialization | behavior/device API request | nested asset name/URL or user-input display fields |
+| Media delivery | `/media/...` | Nginx proxies request to Django API; Django only adds media-serving routes in debug mode |
+
+## 3. Canonical Flows
+
+### Binary file creation through admin
+
+```text
+multipart admin form
+  -> model field validation
+       -> extension from filename
+       -> MIME guessed from filename
+       -> byte-size limit
+       -> ImageField/Pillow validation for images
+  -> FileField upload_to="<kind>/"
+  -> OverwriteStorage(location="/media/<kind>/")
+  -> physical file /media/<kind>/<kind>/<original-name>
+  -> SkabenFile.save(): time/UUID-derived MD5 hash
+  -> database row
+```
+
+Limits are 30 MiB audio, 120 MiB video, and 5 MiB image. Audio accepts `mp3`, `wav`, `ogg`, `spx`, `oga`, and `webm`; video accepts `webm`, `mp4`, `mp4v`, and `mpg4`; image accepts `png`, `jpg`, `jpeg`, and `webp`.
+
+`OverwriteStorage` removes any existing physical path before writing. Because binary filenames are not namespaced by asset UUID, uploading the same basename for a second record replaces bytes used by the first record. Database records can therefore share one path while carrying different hashes/names.
+
+### Binary API create
+
+```text
+POST /api/assets/<kind>/ with name and optional attempted file
+  -> FileSerializer treats file as read-only SerializerMethodField
+  -> uploaded file ignored/rejected as writable input
+  -> model may persist empty file name
+  -> response serialization calls obj.file.path
+  -> ValueError when no file is associated
+```
+
+Observed result is a likely HTTP 500 after an invalid metadata row has already been inserted. OpenAPI exposes `file` as read-only while still advertising full create/update routes. Existing valid rows can be listed/retrieved; file replacement through this serializer is impossible.
+
+### Text file save
+
+```text
+TextFile(ident, name, content).save()
+  -> build ContentFile(content)
+  -> file name <uuid>_<ident>.txt
+  -> storage path /media/text/text/<uuid>_<ident>.txt
+  -> delete same-name blob if present
+  -> write blob before database save
+  -> SkabenFile.save() replaces hash with time/UUID-derived MD5
+  -> database insert/update
+```
+
+The first hash assigned in `TextFile.save()` is overwritten by `SkabenFile.save()`. Changing `ident` produces a new filename and leaves the old blob. Database failure after blob write leaves an orphan. Replacement failure after delete can leave the database pointing to missing content.
+
+### Text API create
+
+```text
+POST /api/assets/textfile/ with exposed name/file fields
+  -> serializer excludes uuid, hash, ident, and content
+  -> TextFile gets empty ident/content
+  -> save generates empty text file named <uuid>_.txt
+  -> first blank ident may persist
+  -> later create conflicts with unique ident=""
+```
+
+Any uploaded `file` value is replaced by generated content during model save. This API does not expose the actual editable text contract.
+
+### Menu asset delivery
+
+```text
+MenuItemAudio|Video|Image|Text -> asset FK
+  -> nested menu serializer
+  -> binary: {name, file=<request-host absolute URI>}
+  -> text: {name, file=<storage URL>}
+  -> menu/account hash includes asset.hash
+```
+
+Deleting an asset cascades through its `MenuItem*` foreign keys, deleting referencing menu items. Django does not delete the corresponding filesystem blob automatically.
+
+### Media serving
+
+```text
+client GET /media/...
+  -> Nginx location /media
+  -> proxy to API container
+  -> Django static(settings.MEDIA_URL, MEDIA_ROOT)
+```
+
+`django.conf.urls.static.static()` serves media only with `DEBUG=True`. Production settings set `DEBUG=False`, Nginx has no `/media` volume/alias, and `/media` is only proxied to Django. Current production topology therefore has no confirmed media-serving path.
+
+## 4. Contracts
+
+### Binary asset models
+
+- Role: named audio, video, or image resource with UUID primary key, stored file name, and cache/change hash.
+- Input/state: `name` maximum 128 characters; required `file`; UUID is generated and not editable; hash is database-editable false.
+- Storage: hard-coded `OverwriteStorage` roots `/media/audio/`, `/media/video/`, and `/media/image/`, plus matching `upload_to` prefix. Resulting physical path repeats the kind segment.
+- Behavior: every model save recalculates hash as MD5 of current Unix second plus UUID. Hash is not a digest of file bytes or metadata.
+- Output/effects: menu-item and terminal-account hashes incorporate asset hash; model/admin preview URI concatenates `settings.BASE_URL` with local `file.path`.
+- Invariants: UUID identifies database row. Filename/path is not unique in database and storage overwrite makes it shared by basename.
+- Edge cases: two saves in one second can retain same hash despite changed data; metadata-only saves in later seconds change hash despite unchanged content; missing file makes `file.path` and preview/serialization fail.
+
+### `TextFile`
+
+- Role: editable text document materialized as a generated text blob.
+- Input/state: unique alphanumeric `ident` up to 128 characters, visible `name` up to 128, unrestricted text `content`, nullable/blank file field.
+- Behavior: every save writes `content` into `<uuid>_<ident>.txt` before metadata persistence. UTF-8 is used by `ContentFile` for string content.
+- Output/effects: physical path is under `/media/text/text/`; model `uri` uses `BASE_URL + file.path`.
+- Invariants: `ident` is unique and validated by `^[a-zA-Z0-9]+$` when model validation runs. Plain ORM save does not call full validation.
+- Edge cases: API hides ident/content; changing ident or deleting row leaves old/current files; first generated hash is dead assignment; text URL behavior differs between model property and API serializer.
+
+### File validation
+
+- Role: reject disallowed filename extension, filename-derived MIME, and oversized upload.
+- Input/state: validator receives Django uploaded value and uses `value.name` plus `len(value)`.
+- Behavior: extension is lowercased. MIME uses `mimetypes.guess_type(value.name)`, so it is another filename check, not content inspection.
+- Output: raises Django `ValidationError` with allowed extensions/types or formatted size.
+- Invariants: configured maximum allows exactly the limit; minimum defaults to zero, so zero-byte audio/video files can pass this validator.
+- Edge cases: renamed arbitrary bytes can pass audio/video checks. Image admin forms gain Pillow verification from `ImageField`; audio/video have no magic-byte or decoder validation. Direct ORM saves bypass validators.
+
+### Storage adapter
+
+- Role: local filesystem storage with stable caller-supplied name.
+- Startup effect: importing `assets.storages` synchronously creates `/media/audio`, `/media/video`, `/media/image`, and `/media/text`.
+- Behavior: `get_available_name()` deletes an existing path with `os.remove()` and then delegates to `FileSystemStorage`.
+- Invariants: application processes must have write permission on absolute `/media`; migration imports instantiate the same storage classes and paths.
+- Edge cases: delete and replacement are not atomic; failures are not recovered; direct `os.remove()` bypasses storage abstraction; concurrent same-name saves race. Worker/scheduler containers do not mount the shared `files_volume` but still import installed asset models and may create private `/media` directories.
+
+### API
+
+- Routes: full list/create/retrieve/update/partial-update/destroy for `textfile`, `imagefile`, `audiofile`, `videofile`, `hackgame`, and `userinput` beneath `/api/assets/`.
+- Lookup IDs: file and user-input detail routes use UUID; hack-game detail uses integer ID.
+- Payload omission: every serializer excludes its primary key, so list responses do not expose identifiers needed to construct detail/update/delete URLs.
+- Binary payload: `name` plus read-only absolute `file`; UUID and hash excluded.
+- Text payload: `name` and nullable file URL; UUID, hash, ident, and content excluded.
+- Hack payload: attempts, difficulty, wordcount, chance; ID excluded. Difficulty choices are 6, 8, 10, or 12; other integer fields have no domain bounds.
+- User-input payload: action, expected, delay; UUID excluded. Action is unique and defaults to `action`; expected defaults empty; delay defaults 0 and permits null/negative integers.
+- Ordering/pagination: querysets have no explicit ordering; app defines no pagination.
+- Access policy: every view declares `ModelViewSet` before `DynamicAuthMixin`, so DRF superclass hooks win and the mixin is ineffective. Project defines authentication classes but no authenticated permission; default `AllowAny` makes full asset CRUD public at application level. Auth middleware enforcement is commented out.
+
+### URI and downstream wire behavior
+
+- Binary serializer builds URL with `request.build_absolute_uri(obj.file.path)`. It depends on local filesystem `.path`, exposes the repeated physical path, and cannot support non-filesystem storage.
+- Model `uri` uses configured `BASE_URL`, while API binary output uses request host. These authorities can disagree.
+- Text serializer uses normal DRF `FileField` URL behavior, based on storage `base_url`/relative `MEDIA_URL`; it does not use physical `.path`. With storage rooted at `/media/text/` plus name `text/...`, generated URL can omit one physical `text` segment or resolve relative to the current request path.
+- Nested behavior serializers expose binary/text asset payloads in menu and terminal-account responses. Binary method field requires a serializer context containing `request`; background serialization without it raises `KeyError`.
+- Asset save changes menu/account hash inputs but publishes no device-update event. Clients can remain stale until another refresh occurs.
+
+### Relational deletion
+
+- Each concrete menu item references its asset with `on_delete=CASCADE`.
+- Deleting an asset deletes referencing menu-item child/base rows and can remove those items from terminal-account menus.
+- Deleting a menu item does not delete its asset.
+- Django model deletion does not remove `FileField` bytes. Database/file lifecycle is asymmetric in both directions.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| `/media` cannot be created/written during import | Django startup, migration import, worker, or command can fail | Provision storage outside module import; fail readiness with explicit diagnostics |
+| Public caller mutates/deletes asset | Operation allowed by default `AllowAny`; related menu rows may cascade | Require explicit operator permission; separate read delivery from management |
+| Binary API create | File cannot be submitted; empty-file row may persist, then response raises | Accept validated multipart upload or make endpoint read-only |
+| Text API create | Hidden ident/content become empty; first bad row/file may persist, later unique failure | Expose valid text command or make endpoint read-only |
+| Same binary basename uploaded twice | Existing blob deleted/replaced; multiple rows point at changed shared bytes | UUID/content-addressed storage names; reject or version explicitly |
+| Blob write succeeds, DB save fails | Orphan blob remains | Staged write plus commit/finalize/cleanup policy |
+| Existing blob deleted, replacement write fails | Previous content lost while DB still references path | Atomic replacement/versioned immutable blobs |
+| Asset row deleted | Blob remains; referencing menu rows cascade-delete | Explicit protected/cascade policy plus transactional/reference-aware blob cleanup |
+| File content spoofed by extension | Audio/video validator accepts renamed bytes | Content sniff/decoder validation and safe serving headers |
+| Missing/corrupt file serialized | `.path`/URL access raises; API/menu response fails | Typed unavailable state and repair/report path |
+| Hash expected to represent content | Time-based hash changes without content change or misses same-second change | Content digest or explicit monotonically versioned contract |
+| Production requests media | Nginx proxies to Django, which has no production static media route | Dedicated media alias/object store with shared volume and access policy |
+| Relative/inconsistent media URL | Different serializers/properties produce different or broken URLs | One storage-generated canonical URL policy |
+| Concurrent same-name upload | Delete/write races; final bytes nondeterministic | Immutable unique key plus serialized metadata update |
+| Duplicate default `UserInput` or invalid game values | DB uniqueness/incoherent configuration error | Domain validation and clear conflict response |
+
+- Concurrency/order: no storage lock, object version, checksum precondition, transaction/outbox, or cleanup queue exists. Database commit and filesystem operations cannot be atomic. List order is unspecified.
+- Reliability: no blob existence health check, orphan reconciliation, backup/versioning, upload status, retry, or compensating cleanup exists. Overwrite destroys recovery point before new write succeeds.
+- Security/operations: public CRUD plus cascade delete is high-impact. File checks trust names, media delivery headers are unspecified, and CORS allows all origins. Absolute local storage paths and module-import directory creation tie every process to one deployment layout.
+
+## 6. Gaps
+
+- Tests: no tests cover models, validators, storage, API, admin, media serving, hashes, deletion, menu serialization, or concurrency.
+- Docs: no asset-management or media-serving documentation exists; operating-doc images are repository documentation assets, not this app's runtime assets.
+- Validation: allowed codecs/content, zero-byte policy, game bounds, user-input delay bounds, filename normalization, duplicate basename policy, and text encoding are not explicitly defined.
+- API/schema: generated OpenAPI advertises full writable CRUD while binary file is read-only and all primary keys are omitted. Text schema hides its source fields. No lifecycle or cascade semantics appear.
+- Deployment: only API container mounts `files_volume`; Nginx proxies media instead of mounting it; production Django does not serve media. Worker containers import hard-coded storage without shared media.
+- Defects: import-time filesystem mutation, repeated path segments, destructive basename overwrite, broken binary/text create endpoints, inconsistent URLs, time-based non-content hash, orphan blobs, cascade surprises, ineffective auth mixin, and missing response IDs.
+- Dead/uncertain behavior: no source-code consumer of `HackGame` was found. `TerminalAccount.has_files` references `item.option`, but no such model property was found and the property has no source caller.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `AssetMetadataRepository` | Persist UUID, display name, type, content digest/version, and storage key | No filesystem calls in model save; preserve UUID/FK compatibility |
+| `BlobStorage` | Stage, finalize, open, URL, and delete immutable blobs | Configured root/backend; no import-time writes; atomic/versioned naming |
+| `AssetUploadService` | Authorize, validate content, write blob, persist metadata, compensate failures | Bounded streaming; explicit idempotency and duplicate policy |
+| `TextAssetRenderer` | Validate ident/content and generate UTF-8 blob | Deterministic versioned output; old-version cleanup policy |
+| `AssetDeliveryService` | Return canonical public/private URLs and availability state | Same semantics for direct and nested serialization; backend-independent |
+| `AssetReferencePolicy` | Decide protected deletion versus cascade and report consumers | Preserve menu integrity; cleanup only after commit |
+| `GameConfigService` | Validate and serve hack-game settings | Explicit singleton/multi-row ownership and numeric bounds |
+| `UserInputService` | Validate action/expected/delay commands | Preserve unique action and UUID identity; explicit delay units/range |
+
+## 8. Migration Order
+
+1. Characterize valid admin uploads, existing storage keys/URLs, nested menu payloads, hashes, and every create/update/delete failure.
+2. Lock asset mutations behind explicit permissions and disable broken API write paths until characterized.
+3. Make blob write, metadata commit, media availability, and cleanup outcomes observable.
+4. Introduce configured immutable storage keys and canonical URL generation while retaining legacy-read fallback.
+5. Extract upload/text rendering, content validation, repositories, and reference-aware deletion from model `save()`.
+6. Backfill content digests/versions and migrate existing repeated-path blobs without breaking menu references.
+7. Remove hard-coded `/media`, delete-before-save storage, local `.path` serialization, and legacy routes after compatibility verification.
+
+## 9. Minimum Tests
+
+- Admin upload success for each supported audio/video/image extension and exact size boundaries.
+- Extension mismatch, uppercase extension, MIME/content mismatch, corrupt image, zero-byte file, oversized file, and unsafe filename.
+- Binary API list/retrieve plus explicit read-only or corrected multipart create/update behavior.
+- Text create/update with ident/content, Unicode, ident validation, rename, same-path replacement, and rollback.
+- UUID/ID presence in list/detail payloads and route round-trip for every viewset.
+- Public/anonymous, authenticated non-operator, and operator read/write/delete permissions.
+- Same basename across records, concurrent uploads, failed replacement, DB failure after write, and retry/idempotency.
+- Hash changes only under approved content/version rules; menu/account/device hash propagation and refresh.
+- Delete with zero/one/many menu references; blob cleanup after commit; orphan reconciliation.
+- Development and production media URL/download behavior behind Nginx, including exact content type and security headers.
+- Hack-game choices/bounds and user-input uniqueness/default/delay policy.
+- Wire/schema compatibility for nested audio/video/image/text/user-input menu payloads.
+
+## 10. Do-Not-Lose
+
+- Existing UUID primary keys for audio, video, image, text, and user-input records; integer IDs for hack-game rows.
+- Existing menu-item foreign-key relationships and explicit chosen behavior for referenced-asset deletion.
+- Display name, text ident/content, user-input action/expected/delay, and hack-game setting compatibility.
+- Supported extension and size contracts until clients/operators receive a versioned replacement.
+- Leading storage/media compatibility for existing database file names and physical blobs during migration.
+- Menu payload fields consumed by terminal clients: timer, label, nested content name/file, input label, and input description.
+- Stable client-visible asset URL semantics, with legacy URL redirects/read fallback during storage migration.
+- Reliable cache/change identity for menu and terminal configuration; replace current hash deliberately, not silently.
+- Required ability to preview/manage assets in custom admin and deliver them to game clients.
+
+<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->

@@ -1,0 +1,347 @@
+# AGENT REFERENCE: EVENT CONTEXTS
+
+Reviewed: 2026-08-24
+Scope: `server/event_contexts` and direct dependencies
+Purpose: behavior map for preserving event-driven game rules during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/alert/.agent-review` before changing this area.
+3. Treat code and worker settlement behavior as authoritative; use tests, fixtures, and docs as supporting evidence.
+4. Preserve confirmed wire and game-rule contracts, not swallowed failures, false success logs, recursive model events, or unconditional ACK behavior.
+5. Keep event decoding, routing, domain decisions, persistence, publishing, device commands, logging, and message settlement separate.
+6. Make ordering, concurrency, idempotency, retries, dead-letter policy, and partial effects explicit.
+
+## 1. Sources
+
+- Primary: `server/event_contexts/alert/{events,context,tasks}.py`, `server/event_contexts/device/{events,context,lock_access_context,power_shield_context}.py`, `server/event_contexts/device_update_context.py`, and `server/event_contexts/exceptions.py`
+- Entrypoints: device INFO packets routed through `python manage.py start_worker internal`, internal alert/device events, `python manage.py start_scheduler`, and direct `LockEventContext` use by the client-update worker
+- Runtime orchestration: `server/core/worker_queue_handlers/{ask_mqtt_handler,internal,client_update}.py`
+- Event/transport dependencies: `server/core/transport/{events,publish,config,topics,packets}.py`, `server/core/helpers.py`, and `server/core/tasks.py`
+- Domain dependencies: `server/alert/{models,service}.py`, `server/peripheral_devices/models/{base,lock,terminal}.py`, `server/peripheral_behavior/models/access.py`, and `server/core/models/mqtt.py`
+- Side-effect dependencies: `server/streams/models.py`, device configuration publishers, PostgreSQL, and RabbitMQ
+- Evidence: `server/tests/test_alert/test_event_types.py`, `server/tests/test_core/test_events.py`, `server/tests/test_workers/*`, `docs/development/addressing.md`, `server/settings.py`, and standard power-state data in `skaben_data.json`
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `alert.events` | Pydantic DTOs for named-state and numeric-counter events | alert models, scheduler, power context, internal worker |
+| `alert.context.AlertEventContext` | Apply alert events, persist transitions, create logs, and request device updates | `InternalHandler` |
+| `alert.tasks` | Build reaction and scheduled counter-change events | scheduler; reaction helper currently has no source caller |
+| `device.events.SkabenDeviceEvent` | Envelope for normalized device INFO payloads | `InternalHandler`, `DeviceEventContext` marker check |
+| `device.context.DeviceEventContext` | Dispatch device events by device type and convert selected failures to log events | `InternalHandler` |
+| `device.lock_access_context.LockEventContext` | Log lock access results and bootstrap unknown locks/cards in white state | device dispatcher and client-update worker |
+| `device.power_shield_context.PowerShieldEventContext` | Convert power-shield state into alert-state follow-up event | device dispatcher |
+| `device_update_context.ClientUpdateContext` | Mutate all locks/terminals for selected alert states | no source caller found; currently dormant |
+| `exceptions.StopContextError` | Signal expected domain rejection carrying operator-facing text | device subcontexts |
+| `core.transport.events.SkabenEventContext` | Own generated-event list and create `SkabenLogEvent` objects | every context |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| MQTT INFO flow | `ask.<type>.<uid>.info` with `datahold` | normalized device event, DB/log/follow-up effects, source ACK |
+| Internal domain event | queue `internal`, header `event_type` | alert context then device context, logs persisted, follow-up events republished |
+| Scheduled alert flow | Redis scheduler due task | optional `AlertCounterEvent(event_source="scheduled")` |
+| Missing-lock client update | `client_update.lock.<uid>` for absent lock | direct white-state lock bootstrap attempt and log |
+| Dormant state-to-device mutation | `ClientUpdateContext.apply(alert_state)` | synchronous lock/terminal bulk-by-loop changes if manually invoked |
+
+## 3. Canonical Flows
+
+### Device INFO ingress
+
+```text
+ask.<device_type>.<device_uid>.info
+  -> AskHandler parses JSON/datahold and evaluates keepalive
+  -> internal.<device_type>.<device_uid>.info
+  -> InternalHandler builds SkabenDeviceEvent(event_source="mqtt")
+  -> encode headers/body
+  -> AlertEventContext (no-op for device event)
+  -> DeviceEventContext
+  -> LockEventContext or PowerShieldEventContext
+  -> generated logs saved OR generated alert event republished
+  -> source message ACK
+```
+
+An offline/new device's packet is replaced upstream with a CUP request, so its INFO action does not reach these contexts. `InternalHandler` executes INFO handling inline; it does not first publish the normalized `SkabenDeviceEvent` as a separate queue message.
+
+### Internal event dispatch
+
+```text
+message.headers.event_type present
+  -> if log + save=true: persist StreamRecord and stop
+  -> otherwise AlertEventContext.apply()
+  -> DeviceEventContext.apply()
+  -> partition generated events
+       -> log events bulk_create as StreamRecord(stream="log")
+       -> non-log events publish back to routing key internal
+  -> ACK source message
+```
+
+Context order is fixed: alert first, device second. Unknown event types are ignored by both and acknowledged. Generated logs are persisted before generated non-log events are published. There is no transaction joining domain writes, log writes, follow-up publishes, or source settlement.
+
+### Lock interaction
+
+```text
+device event headers: device_type=lock, device_uid=<MAC>
+body.payload: {access_code, success, ...}
+  -> lookup Lock by exact mac_addr
+  -> lookup AccessCode by exact code
+  -> persist informational log using device-provided success truthiness
+```
+
+Unknown-object branching is ordered by the two lookups:
+
+```text
+unknown lock
+  -> white current state: create Lock, trigger model update side effect, log creation
+  -> other state: no creation, log refusal
+
+known lock + unknown access code
+  -> require code string length == settings.ACCESS_CODE_CARD_LEN (6)
+  -> require white current state
+  -> get/create skaben_default user
+  -> create AccessCode without permissions
+  -> log creation
+```
+
+If lock and code are both unknown, missing-lock handling wins; code is ignored until a later event. Existing access is not authorized server-side here: context trusts the device's `success` value and records allowed/denied text. Any truthy value, including nonempty string `"false"`, logs allowed.
+
+### Power-shield progression
+
+```text
+device event headers: device_type=pwr
+body.payload.powerstate
+  -> lowercase command
+  -> aux while current state is blue
+       -> AlertStateEvent(event_source="pwr", state="cyan")
+  -> pwr while current state is cyan
+       -> AlertStateEvent(event_source="pwr", state=<first ingame by order>)
+  -> off
+       -> no event
+  -> generated event republished to internal queue
+  -> later AlertEventContext changes state
+```
+
+Fixture values use uppercase `AUX`, `OFF`, and `PWR`, which lowercasing accepts. Valid commands in the wrong current state silently do nothing. Missing/empty command silently does nothing. Unknown nonempty command becomes an error log via `StopContextError`.
+
+### Alert-state event
+
+```text
+AlertStateEvent
+  -> validate headers/body
+  -> external source + different current name
+       -> persist current state using source marker
+       -> model emits secondary alert_state event
+       -> log requested switch
+       -> return before counter reset/device fanout
+  -> model/self event or already-current external event
+       -> optional counter reset to state threshold
+       -> enqueue client_update.<topic>.all for every active topic
+```
+
+External state changes depend on a model-generated secondary event for final device fanout. Model source markers decide recursion/counter reset; exact behavior is documented in `server/alert/.agent-review`.
+
+### Alert-counter event
+
+```text
+AlertCounterEvent(set|increase|decrease)
+  -> validate
+  -> external source: append/update via AlertService, derive state, maybe save state/log
+  -> model-generated source alert_counter: derive state, maybe save state, refresh scl
+  -> model saves may publish secondary counter/state events
+```
+
+Observed self-event defects include `set_state_current(None)` for unmapped values and reference to undefined `old_state` after a state change. Exceptions escape the context, are logged by `InternalHandler`, and source event is acknowledged.
+
+### Scheduled automatic alert event
+
+```text
+scheduler AlertTask
+  -> create_alert_auto_event()
+  -> current state + latest counter + threshold range
+  -> disabled: no event, retry after SCHEDULER_TASK_TIMEOUT
+  -> enabled: increase/decrease/set event, retry after state.auto_timeout
+  -> publish to internal queue
+```
+
+Threshold crossing uses hard-coded dampener 30. Missing next/previous state can raise. Misconfigured `auto_change` raises and can terminate scheduler process. `create_alert_reaction_event()` builds similar increase/decrease events from current-state deltas but no source caller exists.
+
+### Dormant alert-to-device mutation
+
+```text
+ClientUpdateContext.apply(AlertStateEvent)
+  -> white: terminal power on, terminals/locks unblocked, locks closed
+  -> blue: terminal power off, terminals blocked, locks unblocked
+  -> cyan: terminal power off, locks unblocked
+  -> black: all four operations true
+  -> green/yellow/red/other: no changes
+```
+
+No import, dispatcher entry, or caller activates `ClientUpdateContext`. Current state changes refresh device configurations but do not execute this database mutation table. If activated, manager methods iterate and save devices one by one, with per-row publish side effects and no transaction.
+
+## 4. Contracts
+
+### Base event/context contract
+
+- `SkabenEvent` headers are selected properties; normal base headers are `event_type` and `event_source`.
+- Event body is `model_dump()` excluding header fields.
+- `decode()` accepts dict or JSON bytes/string, inserts selected header values first, then expands body data. Body keys can therefore override header `event_type` or `event_source`.
+- Pydantic default extra-field policy ignores unmodeled fields; no schema version, event ID, timestamp, correlation ID, causation ID, attempt, or idempotency key exists.
+- `SkabenEventContext` owns a fresh `events` list per instance/context-manager entry. `__exit__()` does not suppress exceptions or clean resources.
+- `add_log_event()` appends a `SkabenLogEvent` with source equal to lowercased context class name, level `info|log|error`, optional message data, and default `save=true`.
+
+### Alert event wire format
+
+- State headers: `{"event_type": "alert_state", "event_source": <string>}`.
+- State body: `{"state": <string>, "counter_reset": <bool>}`; reset defaults true.
+- Counter headers: `{"event_type": "alert_counter", "event_source": <string>}`.
+- Counter body: `{"value": <int>, "change": "increase"|"decrease"|"set", "comment": <string|null>}`.
+- `comment` is typed optional but has no default, so it is required under current Pydantic behavior and may be null.
+- Concrete `event_type` fields are plain strings with defaults, not literals/constants. Validation does not require an instance's value to match its class `_event_type` marker.
+- Source strings `alert_state` and `alert_counter` are not descriptive metadata only; models/contexts use them as recursion-suppression and counter-reset control signals.
+
+### Device event wire format
+
+- Headers: `{"event_type": "device", "event_source": <string>, "device_type": <string>, "device_uid": <string|null>}`.
+- Body: `{"payload": <dict|null>}`.
+- `device_uid` is required but nullable. Payload defaults to an empty dict and is nullable.
+- Declared payload values allow strings, integers, booleans, dicts, and lists; direct internal events are not decoded/model-validated by `DeviceEventContext`.
+- Static allowed device types are `box`, `rgb`, `scl`, `pwr`, `lock`, and `terminal`; only `lock` and `pwr` have subcontexts.
+- Observed validator defect: invalid device type raises `pydantic.ValidationError` incorrectly inside a field validator, producing `TypeError: ValidationError.__new__() missing 1 required positional argument: 'line_errors'` instead of a validation error.
+
+### Device dispatcher
+
+- Reads `event_type` and `device_type` only from headers; extracts body field `payload` without constructing `SkabenDeviceEvent`.
+- Unknown event type/device type returns false and creates no log/audit event.
+- Copies generated events from selected subcontext, preserving their order.
+- Converts `StopContextError`, `ValueError`, and Pydantic `ValidationError` to error log events.
+- Does not catch `TypeError`, `AttributeError`, database errors, transport errors, or other exceptions. Those reach `InternalHandler`, which logs to process logs and ACKs.
+- Null/non-dict payload reaches subcontexts and can cause uncaught `.get()` failures.
+
+### Lock rules
+
+- Lock identity is exact `device_uid`/`mac_addr`; model maximum is 12 characters and validation is not invoked by `objects.create()`.
+- Known lock/code produces one informational context log. `success` is interpreted by Python truthiness, not strict boolean validation.
+- Unknown lock can be created only while named state `white` is current. Creation calls `objects.create()` and then redundant second `save()`; first save may publish a device configuration.
+- Unknown code can be created only in white state and only when string length is exactly 6. Stored `AccessCode` supports up to 16 characters, so bootstrap policy is narrower than model/admin import policy.
+- New code belongs to fixed `skaben_default` user and receives no lock permission rows.
+- `get_or_create()` includes both default-user name and description in lookup. Existing same-name user with changed description can lead to a unique-name creation error.
+- Expected domain rejections become persisted error logs; database/race failures are lost after process logging and ACK.
+
+### Power-shield rules
+
+- Commands are case-insensitive strings: `aux`, `off`, and `pwr`.
+- State names are hard-coded: blue prerequisite, cyan intermediate, first ingame state target.
+- `settings.PWR_STATE_DISPATCH_TABLE` defines `{"aux": "cyan", "on": "green"}` but this context does not use it; implementation command is `pwr`, not `on`.
+- Generated alert event source is `pwr`, reset flag uses default true, and persistence occurs only after successful follow-up delivery.
+- No log is created for valid no-op command, successful follow-up creation, or state precondition mismatch.
+
+### Log persistence
+
+- Generated log events become `StreamRecord` rows with stream `log`, source=context name, mark=level, message, and optional JSON message data.
+- Records are inserted using one `bulk_create()` before non-log follow-up publication.
+- Incoming `log` event with `save=true` bypasses contexts and is persisted directly. `save=false` log event falls through both contexts and is effectively discarded.
+- Comment/docstring claiming log events go to a stream RabbitMQ queue is stale; implementation writes PostgreSQL.
+- Stream persistence failure prevents later follow-up publishes, then source message is ACKed by top-level handler.
+
+### Message settlement and publishing
+
+- `InternalHandler.handle_message()` catches every uncaught exception, logs it, then ACKs if not already settled.
+- Unknown events, malformed direct events, transient database failures, and partial-effect failures can therefore be permanently lost.
+- Generated non-log events use a fresh publisher and routing key `internal`. Publisher catches all exceptions and exposes no success/failure result.
+- Model-triggered alert events and device-update fanout use the same unobservable publish path.
+- No retry count, requeue policy for domain events, dead-letter queue, deduplication, effect ledger, or poison-message quarantine exists.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Unknown internal `event_type` | Both contexts ignore; worker ACKs silently | Explicit unsupported-event metric/log or typed discard policy |
+| Unknown/unhandled device type | Device context returns false; worker ACKs silently | Registry-driven policy; distinguish valid no-op from unsupported |
+| Invalid device type during INFO normalization | Validator raises wrong `TypeError`; top-level worker logs and ACKs | Correct validation error; reject/DLQ with diagnostics |
+| Direct device event malformed/null payload | No envelope validation; `.get()` may raise; worker ACKs | Validate once at ingress before dispatch |
+| Body overrides header type/source during decode | Wrong handler branch, no-op, or attribute error can occur; worker ACKs | Reserve envelope keys to headers and reject conflicts |
+| Expected lock/power rejection | Converted to DB log, then ACKed | Preserve domain rejection outcome with stable reason code |
+| Lock/card bootstrap DB failure or race | Process log only; message ACKed; partial model side effects possible | Transactional idempotent command with retry/conflict policy |
+| Device reports non-boolean `success` | Truthiness can record false result as allowed | Strict boolean/schema validation or server-side authorization result |
+| Follow-up power event publish fails | Publish error swallowed; INFO ACKed; state never changes | Confirm durable outbox enqueue before source ACK |
+| Alert write succeeds, secondary event fails | DB state/counter persists without reset/fanout | Transactional outbox and observable pending effects |
+| Unknown alert state | Can log successful switch despite no state change, or raise later | Validate target before logging/mutation |
+| Counter maps to no state | May call `set_state_current(None)` and lose event | Explicit clamp/reject/retain-state policy |
+| Self counter changes state | Undefined `old_state` raises after DB write; ACK skips refresh | Atomic transition plan and deterministic effects |
+| Stream log insert fails | Follow-up events not published; source ACKed | Separate required/optional audit policy and retryable unit of work |
+| Duplicate delivery | Counter rows, logs, code/device creation, and publishes can duplicate/conflict | Event ID plus idempotent handlers/effect records |
+| Multiple internal workers | Global alert/lock actions can interleave without serialization | Partition/lock by aggregate and preserve per-device/global order |
+| Scheduler missing neighbor/bad config | Exception can stop scheduler process | Typed configuration failure and isolated recurring-task retry |
+| Dormant client-update context assumed active | No state-based lock/terminal DB mutation occurs | Delete dead policy or wire it explicitly after characterization |
+
+- Concurrency/order: one callback is synchronous within one worker, but no global guarantee prevents multiple workers. Alert transitions, counter read-modify-write, default-user/card creation, and lock creation have no row/advisory locks. Follow-up events introduce extra queue turns and can reorder with newer input.
+- Reliability: persistence and publishing are interleaved without transaction/outbox. Source ACK is effectively unconditional. Publisher failures are swallowed. No idempotency, retry metadata, DLQ, timeout budget, or partial-effect reconciliation exists.
+- Security/operations: internal broker messages are trusted as commands. RabbitMQ port is host-exposed in current Compose deployment; authorization depends on broker credentials/network controls. Device access result is trusted rather than recalculated. Logs can include access codes and device identifiers.
+
+## 6. Gaps
+
+- Tests: four alert DTO tests cover basic state/counter validation and encoding. No alert context, device DTO, dispatcher, lock, power, scheduler-helper, log persistence, settlement, retry, or concurrency tests exist.
+- Test drift: `server/tests/test_core/test_events.py` imports nonexistent `EncodedEventType`, while current transport class is `EncodedEvent`; this supporting test cannot characterize current code unchanged.
+- Worker tests: only mocked `BaseHandler.dispatch()` behavior is covered; no concrete `InternalHandler` event path is tested.
+- Docs: addressing docs describe INFO at packet level but no payload schemas, lock bootstrap, power progression, alert source semantics, error settlement, or logging behavior.
+- Validation: direct internal device events bypass DTO validation. Lock payload, power payload, event versions, source allowlist, code sensitivity, and strict success typing are undefined.
+- Defects: body-overrides-header decoding, non-constant concrete event types, invalid Pydantic exception construction, undefined alert `old_state`, possible null state assignment, false alert success log, mutable-style payload default, malformed `StopContextError.args`, unchecked payload types, narrow catches, unconditional ACK, and swallowed follow-up publish errors.
+- Dead/uncertain code: `ClientUpdateContext`, `create_alert_reaction_event()`, and `DeviceNotFoundEvent` have no source callers. Intended activation/removal and compatibility requirements are unknown.
+- Fixture drift: `skaben_data.json` is currently modified and includes runtime data; use power-state examples as supporting evidence, not immutable truth.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `EventEnvelope` | Versioned type/source/ID/time/correlation/causation schema | Preserve current header/body adapter during migration |
+| `EventDecoderRegistry` | Decode and validate one concrete event before dispatch | Registry-driven device types; typed unsupported/malformed outcomes |
+| `EventRouter` | Route one event to one or more explicit handlers | Deterministic handler order; no side effects in routing |
+| `AlertCommandHandler` | Execute validated state/counter commands | Serialized global aggregate; explicit source/reset policy |
+| `LockInteractionHandler` | Validate interaction, determine access/bootstrap outcome | Strict payload; server-owned authorization; idempotent creation |
+| `PowerShieldPolicy` | Pure command/current-state to optional alert command | Configured state map; explicit valid no-op/error result |
+| `EventUnitOfWork` | Commit domain mutations, audit records, and outbox entries | ACK only after durable commit; compensate/rollback partial effects |
+| `OutboxPublisher` | Deliver follow-up/domain/device events and track attempts | Confirmed publish, bounded retry, DLQ, deduplication |
+| `AuditSink` | Persist structured outcome without controlling required effects accidentally | Redact sensitive values; severity/reason codes; explicit optionality |
+| `ScheduledAlertPolicy` | Pure automatic/reaction event calculation | Handle terminal neighbors/config errors; no process-level failure |
+
+## 8. Migration Order
+
+1. Characterize exact event envelopes, dispatcher order, lock/power decisions, alert recursion, logs, follow-up events, and settlement failures.
+2. Add event IDs/correlation and make domain commit, audit commit, outbox enqueue, publish, and ACK outcomes observable.
+3. Define malformed, unsupported, retryable, discard, idempotency, and dead-letter policies.
+4. Correct DTO validation at ingress and adapt existing MQTT/internal wire formats into typed commands.
+5. Extract pure alert, lock, power, and scheduled policies from ORM/publisher contexts.
+6. Introduce aggregate serialization plus transaction/outbox handlers; move ACK ownership to settlement policy.
+7. Decide and explicitly wire or remove dormant client-update/reaction/device-not-found behavior.
+8. Remove model-save event recursion, source-string control flow, and legacy unconditional ACK after compatibility verification.
+
+## 9. Minimum Tests
+
+- Exact encode/decode headers and bodies for alert state, alert counter, device, and log events.
+- Missing/extra/null/wrong-type fields, invalid event/device type, JSON body, and direct internal-event validation.
+- Dispatcher ordering, unknown event, valid unhandled device, context-generated event ordering, and log partitioning.
+- Lock known/unknown combinations, white/non-white state, six-character boundary, strict success boolean, duplicate/race, and permissions unchanged.
+- Power `AUX|OFF|PWR`, lowercase variants, invalid/missing command, wrong device type, wrong current state, and missing first ingame state.
+- Alert state/counter canonical flows and every source marker/reset branch; unknown/out-of-range state; undefined-variable regression.
+- Scheduler increase/decrease/set, dampener boundaries, disabled state, missing neighbor, invalid auto-change, and reaction helper ownership.
+- Database failure before/after partial writes, audit failure, follow-up publish failure, and publisher confirmation.
+- ACK after full success, transient requeue, bounded poison-event DLQ, duplicate idempotency, and multiple-worker ordering.
+- Dormant `ClientUpdateContext` mapping if retained, including partial device-save/publish failure.
+- Wire compatibility with MQTT INFO `datahold`, fixture power commands, StreamRecord fields, and client-update routing.
+
+## 10. Do-Not-Lose
+
+- Internal event names and header/body split: `alert_state`, `alert_counter`, `device`, and `log`.
+- Alert operations `increase`, `decrease`, and `set`; state name plus `counter_reset` compatibility.
+- Device envelope fields: source, device type, device UID, and payload.
+- MQTT INFO routing format `ask.<device_type>.<device_uid>.info` and normalized source `mqtt`.
+- Power-shield progression represented by current fixture: `blue --AUX--> cyan --PWR--> first ingame`; `OFF` does not transition.
+- White-state bootstrap restriction for unknown locks/cards and exact access-code string preservation.
+- Existing alert source/reset distinction until replaced by explicit command types and verified adapters.
+- Required audit visibility for access results, expected rejections, alert switches, and counter resets—with sensitive-value policy clarified.
+- Device refresh routing after state/counter change and durable follow-up event order.
+- Stream log compatibility: stream `log`, context source, severity mark, message, and optional message data.
+
+<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->

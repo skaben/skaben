@@ -1,0 +1,233 @@
+# AGENT REFERENCE: ADMIN EXTENDED
+
+Reviewed: 2026-08-24
+Scope: `server/admin_extended` and direct dependencies
+Purpose: behavior map for preserving the operator CSV user-import contract during repair or migration
+
+## 0. Rules
+
+1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
+2. Treat `server/admin_extended`, its custom-admin registration, and persistence models as authoritative; use templates and examples as supporting evidence.
+3. Preserve confirmed CSV and data contracts, not unreachable routing, partial imports, uncaught failures, or accidental security behavior.
+4. Keep HTTP/admin transport, file parsing, row validation, import policy, persistence, and reporting separate.
+5. Make authorization, atomicity, duplicate policy, file limits, row ordering, and failure reporting explicit.
+
+## 1. Sources
+
+- Primary: `server/admin_extended/forms.py`, `server/admin_extended/views.py`, `server/admin_extended/templates/upload.html`, `server/admin_extended/templates/success.html`, and `server/admin_extended/apps.py`
+- Entrypoints: intended custom Django-admin paths `upload_csv/` and `download_example_csv/` declared by `core.admin.SystemAdmin.get_urls()`
+- Dependencies: `server/core/admin.py`, `server/core/urls.py`, `server/templates/base.html`, `server/settings.py`, and `server/core/middleware/auth_middleware.py`
+- Persistence: `server/peripheral_behavior/models/access.py`, `server/peripheral_behavior/models/menu.py`, and `server/peripheral_behavior/migrations/0001_initial.py`
+- Runtime consumers: `server/event_contexts/device/lock_access_context.py`, `server/core/healthcheck.py`, terminal accounts, access permissions, and custom admin model registrations
+- Evidence: static example CSV in `download_example_csv()`. No tests, docs, schema routes, or dedicated URL module cover this area.
+
+## 2. Structure
+
+| Path/component | Responsibility | Consumers |
+| --- | --- | --- |
+| `admin_extended.forms.CSVUploadForm` | Validate filename suffix, parse semicolon CSV, create users and access codes | `upload_csv_view` |
+| `admin_extended.views.upload_csv_view` | Render upload form, invoke import, render all users on success | intended custom admin route |
+| `admin_extended.views.download_example_csv` | Return fixed two-row example CSV attachment | upload template link; intended custom admin route |
+| `admin_extended/templates/upload.html` | Show expected header, example-download link, multipart CSRF form, and validation errors | upload GET/invalid POST |
+| `admin_extended/templates/success.html` | Show success text and every persisted game user | successful upload POST |
+| `core.admin.SystemAdmin` | Declare admin-wrapped upload/download routes | currently no consumer because class is not registered |
+| `peripheral_behavior.SkabenUser` | Persist unique game-user name and required description | access codes, terminal accounts, health bootstrap, admin |
+| `peripheral_behavior.AccessCode` | Persist unique code owned by one game user | lock-event lookup, lock permissions, admin |
+
+| Process/flow | Entrypoint/input | Runtime/output |
+| --- | --- | --- |
+| Upload page | Intended authenticated admin GET | `upload.html` with empty `CSVUploadForm` |
+| CSV import | Intended authenticated admin multipart POST | Synchronous decode/parse and row-by-row ORM inserts, then `success.html` |
+| Example download | Intended authenticated admin GET | `text/csv` attachment named `example.csv` |
+| Access-code use | Device INFO containing `access_code` | Runtime lookup by exact stored code; importer itself emits no event or device update |
+
+Current routing reality:
+
+```text
+/admin/ -> custom BaseSiteAdmin
+  -> registered model-admin URL sets only
+  -> SystemAdmin is never registered to a model
+  -> upload_csv/ and download_example_csv/ are absent
+```
+
+`admin_extended` has no `urls.py`, and `core.urls` does not include these views directly. Therefore neither intended endpoint is reachable in current code. If upload rendering became reachable, its `{% url 'system:download_users_example_csv' %}` reference would still fail because no matching namespace or named URL exists.
+
+## 3. Canonical Flows
+
+### Intended CSV upload
+
+```text
+multipart POST with csv_file
+  -> CSVUploadForm filename validation
+  -> read entire file
+  -> UTF-8 decode
+  -> csv.DictReader(delimiter=";")
+  -> for each row in source order
+       -> require user_name, user_description, access_code keys
+       -> require truthy values
+       -> INSERT SkabenUser
+       -> INSERT AccessCode linked to new user
+  -> SELECT all SkabenUser rows
+  -> render success page
+```
+
+This flow is implementation behavior only; routing defects prevent normal execution. Import has no transaction. Earlier rows remain committed when a later row fails. Within one row, user insert occurs before access-code insert, so access-code failure can leave an orphan user.
+
+### Invalid upload
+
+```text
+missing file or filename not ending exactly in ".csv"
+  -> form invalid
+  -> render upload.html with field errors
+```
+
+Only field-cleaning failures participate in normal form error rendering. Header, row, decoding, and database errors occur inside `form.save()` after `is_valid()` and are uncaught by the view, producing an HTTP 500 instead of an invalid form response.
+
+### Example download
+
+```text
+GET intended download route
+  -> fixed ASCII/UTF-8 text
+  -> Content-Type: text/csv
+  -> Content-Disposition: attachment; filename="example.csv"
+```
+
+Body contract:
+
+```text
+user_name;user_description;access_code
+John Doe;Awesome user;1234
+Jane Smith;Cool user;6789
+```
+
+## 4. Contracts
+
+### `CSVUploadForm`
+
+- Role: accept one uploaded file and create one `SkabenUser` plus one `AccessCode` per parsed row.
+- Input/state: multipart field `csv_file`; filename must end with lowercase `.csv`.
+- Parsing: reads full upload into memory, decodes strictly as UTF-8, splits into lines, and uses Python `csv.DictReader` with semicolon delimiter.
+- Required headers: exact, case-sensitive `user_name`, `user_description`, and `access_code`.
+- Row behavior: extra columns are ignored; header order is irrelevant; values are not stripped or normalized; whitespace-only values pass truthiness validation; access codes remain strings, preserving leading zeroes.
+- Output/effects: inserts rows synchronously in CSV order. Returns no import result, count, row diagnostics, or created-object collection.
+- Invariants: every successfully completed row creates a new user and new code. Existing rows are never updated or reused.
+- Edge cases: an empty file or header-only file imports zero rows and reports success. UTF-8 BOM can alter first header name. Case-insensitive extension, content type, encoding, size, row count, duplicate headers, numeric code format, and maximum field lengths are not validated by the form.
+
+### Persistence models
+
+- `SkabenUser.name`: unique, maximum 96 characters.
+- `SkabenUser.description`: required, maximum 96 characters.
+- `AccessCode.code`: unique, maximum 16 characters; model help text describes a numeric/card code, but model and importer accept arbitrary nonempty text.
+- `AccessCode.user`: required foreign key with `CASCADE` on user deletion.
+- `TerminalAccount.user`: also cascades on user deletion; import creates no terminal account.
+- Access permissions point to codes and cascade when a code is deleted; import creates no permissions.
+- Plain `model.save()` does not call `full_clean()`. Length and uniqueness failures therefore surface at database persistence rather than as form row validation.
+- No custom save hooks, event publishing, or cache/device invalidation run for these two imported models.
+
+### `upload_csv_view`
+
+- Role: coordinate form binding and HTML rendering.
+- GET/non-POST: creates empty form and renders `upload.html`.
+- Valid POST: calls `form.save()`, queries all users without explicit ordering or pagination, and renders `success.html` directly.
+- Invalid POST: renders `upload.html` with bound form and implicit HTTP 200.
+- Output: no redirect-after-post. Browser refresh resubmits upload and normally reaches uniqueness failure.
+- Failure behavior: catches no exception from decode, parse, validation in `save()`, or database writes.
+
+### Admin routing and authorization
+
+- `core.urls` mounts custom `BaseSiteAdmin` at `/admin/`.
+- `SystemAdmin.get_urls()` declares relative `upload_csv/` and `download_example_csv/` paths and wraps both with `self.admin_site.admin_view()`.
+- If registered, `admin_view()` would apply active-staff admin permission checks, CSRF protection where applicable, and admin-site behavior.
+- Observed defect: `SystemAdmin` is never registered to any model, so `get_urls()` never contributes routes.
+- Observed defect: both `path()` declarations omit URL names, while upload template reverses `system:download_users_example_csv`; no `system` URL namespace was found.
+- Views themselves have no authentication/permission decorators. Routing them outside `admin_view()` would expose upload/download unless explicit protection is added.
+- Project `AuthRequiredMiddleware` enforcement is commented out and provides no fallback protection.
+
+### Templates
+
+- `upload.html` extends global `base.html`, declares exact header text, uses multipart POST, includes CSRF token, and renders `form.as_p`.
+- `success.html` extends global `base.html` and renders every user's name and description. Django autoescaping protects these values in normal template rendering.
+- Template names are generic (`upload.html`, `success.html`) under app template discovery rather than namespaced as `admin_extended/...`; future apps can collide.
+- `success.html` places a stylesheet `<link>` outside a template block after `{% extends %}`; inherited rendering may discard that markup. Global base already embeds its main generated stylesheet.
+
+### App configuration
+
+- `admin_extended` is installed in `INSTALLED_APPS`, so its templates are discoverable through `APP_DIRS=True`.
+- `ServicesConfig` sets `name="admin_extended"` and `default_auto_field="django.db.models.BigAutoField"`.
+- Package defines no models or migrations; auto-field setting currently has no persistence effect.
+
+## 5. Failure Model
+
+| Failure | Current outcome | Required outcome |
+| --- | --- | --- |
+| Operator opens intended upload/download path | Route not registered; 404/no reverse target | Register explicit, named, admin-protected routes and test resolved paths |
+| Upload template renders after route repair | Reverse of `system:download_users_example_csv` fails | Use actual named URL and stable namespace |
+| Filename lacks lowercase `.csv` | Bound form displays validation error | Preserve clear validation; decide case policy explicitly |
+| Missing/invalid CSV headers | `forms.ValidationError` escapes `form.save()`; HTTP 500 | Validate before writes and attach file/row error to form response |
+| Empty/header-only CSV | Success page with zero imported users | Define whether zero-row import is valid; report count |
+| Invalid UTF-8/BOM | Decode/header exception; HTTP 500 | Detect supported encoding/BOM and return actionable validation error |
+| Missing/empty later row | Earlier rows remain; exception becomes HTTP 500 | Validate all rows first, then atomic commit or explicit partial-import policy |
+| Duplicate user name | Database integrity error; HTTP 500 | Define reject/update/skip policy with row number |
+| Duplicate access code | New user may persist without code; database error becomes HTTP 500 | Atomic row/import and explicit duplicate policy |
+| Field exceeds DB maximum | Database error after possible prior inserts | Validate model limits before transaction |
+| Very large file/row count | Entire decoded content and all result users consume memory/time synchronously | Explicit byte/row limits, streaming or bounded parser, timeout policy |
+| Database unavailable | Uncaught error and HTTP 500 | Atomic rollback plus operator-safe error and audit record |
+| POST response refreshed | Same file resubmitted; uniqueness failure likely | Post/redirect/get with import result identifier |
+| Unauthorized direct view exposure | Views have no local permission checks | Keep behind admin permission wrapper or enforce explicit staff permission |
+
+- Concurrency/order: rows process sequentially per request, but concurrent uploads have no import lock or idempotency key. Unique constraints choose one winner; losing request can retain earlier rows or an orphan user. Success user ordering is database-dependent.
+- Reliability: no `transaction.atomic()`, dry run, staging table, rollback report, idempotency, retry, audit record, or import status exists. Request lifetime owns entire operation.
+- Security/operations: intended admin wrapper is not active because routes are absent. File validation trusts filename only; no explicit size/content limits exist in app. Imported text is autoescaped in HTML, but operator identity, source filename, checksum, counts, and failures are not logged.
+
+## 6. Gaps
+
+- Tests: no tests cover routing, admin authorization, form validation, parsing, persistence, rollback, duplicates, templates, downloads, or concurrency.
+- Docs: no operational or development documentation references this import feature.
+- Routing: intended public path is uncertain because model-admin URLs would be nested beneath a registered model path; no model registration or direct admin-site URL declares ownership.
+- Validation: duplicate policy, blank/whitespace normalization, accepted encodings, BOM, numeric/code length rules, empty import, extra headers, row limits, and update semantics are undefined.
+- Reporting: no created/skipped/failed count, row-number error, downloadable failure report, audit record, or persistent import identity exists.
+- Defects: unreachable routes, nonexistent template URL name/namespace, uncaught post-validation errors, non-atomic partial writes, possible orphan users, zero-row success, unbounded all-user result, and no redirect-after-post.
+
+## 7. Target Boundaries
+
+| Target component | Responsibility | Constraints |
+| --- | --- | --- |
+| `AdminUserImportView` | Enforce staff permission, CSRF, request method, redirect, and result rendering | Stable named admin route; never call unprotected view directly |
+| `CSVUploadValidator` | Validate file metadata, encoding, headers, row shape, normalization, and limits | No database writes; row-number diagnostics; preserve access codes as strings |
+| `UserImportPolicy` | Decide duplicate/update/skip behavior and produce import commands | Explicit empty-file and whitespace policy; deterministic source order |
+| `UserAccessRepository` | Atomically create/update users and codes | Respect unique names/codes, length limits, FK ownership, and rollback policy |
+| `UserImportRecord` | Persist operator, source metadata, checksum, counts, timestamps, and outcome | Avoid storing raw sensitive file unless required and protected |
+| `ExampleCSVResponse` | Serve versioned example matching accepted schema | Named protected route; semicolon and encoding contract explicit |
+
+## 8. Migration Order
+
+1. Characterize intended route/path, admin permission, example format, successful import, and every validation/persistence failure.
+2. Register named admin-site routes and fix template reversal without changing import semantics.
+3. Parse and validate the complete bounded input before any persistence side effect.
+4. Define duplicate, normalization, empty-file, encoding, size, and partial/atomic import policies.
+5. Extract import policy and repository; add atomic persistence and structured result/audit reporting.
+6. Add post/redirect/get and remove direct row creation from the form after compatibility verification.
+
+## 9. Minimum Tests
+
+- Admin URL resolution, stable names/namespace, and template example link.
+- Anonymous, authenticated non-staff, inactive staff, and active staff authorization.
+- GET upload form, valid POST redirect/result, CSRF enforcement, and example download headers/body.
+- Success with one/multiple rows, header reordering, quoted semicolon fields, Unicode, and leading-zero access code.
+- Wrong extension, missing file, malformed/missing headers, missing data, whitespace, BOM, invalid UTF-8, empty/header-only input, extra columns, and oversized input.
+- Duplicate user within file/database, duplicate code within file/database, length violations, and chosen update/skip policy.
+- Dependency failure on user insert and code insert with verified rollback/partial policy.
+- Concurrent duplicate uploads and idempotent retry/refresh behavior.
+- Exact preservation of user/code relationships and no unintended permissions or terminal accounts.
+
+## 10. Do-Not-Lose
+
+- CSV logical fields: `user_name`, `user_description`, and `access_code`.
+- Semicolon-delimited example and parser compatibility until operators receive a versioned replacement.
+- Access codes stored as strings so leading zeroes and card identifiers survive import.
+- One access-code owner relationship and existing unique user-name/code constraints.
+- Active-staff authorization and CSRF protection intended by `admin_site.admin_view()`.
+- Operator-visible validation errors and explicit success/failure counts in repaired flow.
+- Existing downstream compatibility: imported users may own access codes and terminal accounts; imported codes may receive lock permissions and are looked up by exact value.
+
+<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->
