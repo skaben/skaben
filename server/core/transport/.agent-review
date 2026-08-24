@@ -1,24 +1,42 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:14aa20d6cd3cf207966894b413452536f9d04367a8662246e7ee68770409d69d
+scope:
+  - server/core/transport/**
+parent: server/core/.agent-review
+read_when:
+  - changing RabbitMQ topology, publishing, routing, packets, or event envelopes
+target_authority:
+  - .agents/plans/10-target-architecture.md
+  - .agents/plans/40-game-events-and-rabbitmq.md
+roadmap_phases: [P1, P4, P5, P6, P7]
+---
 # AGENT REFERENCE: LEGACY TRANSPORT
 
-Reviewed: 2026-08-24
-Scope: `server/core/transport` and direct callers
-Purpose: behavior map for migration into the modern Django template
+## Quick Context
+
+- Responsibility: canonical current reference for RabbitMQ topology, publishing, routing, packet DTOs, and event DTOs.
+- Confirmed contracts: dot-separated MQTT routes plus PING/PONG/CUP/SUP/INFO wire roles require compatibility coverage.
+- Top defects: uninitialized exchange path, swallowed publish failures, weak routing validation, and incomplete event identity.
+- Target disposition: shared transport infrastructure serving separate runtime processes; one-worker layouts below are superseded candidates.
+- Read next: worker review is conditional only when handler settlement/callback behavior also changes.
 
 ## 0. Agent Rules
 
-1. Read `server/core/.agent-review` first.
-2. Treat `server/core/transport` as the source of current transport behavior.
-3. Read `server/core/worker_queue_handlers/.agent-review` with this file.
-4. Preserve routing/wire contracts only after characterization tests confirm
+1. Treat `server/core/transport` as the source of current transport behavior.
+2. Preserve routing/wire contracts only after characterization tests confirm
    them.
-5. Do not preserve swallowed publish failures, empty exchange configuration,
+3. Do not preserve swallowed publish failures, empty exchange configuration,
    or model-triggered publishing as desired behavior.
-6. Keep broker adapters, message DTOs, domain events, and handler policy in
+4. Keep broker adapters, message DTOs, domain events, and handler policy in
    separate modules in migrated code.
-7. A publish operation must return success or raise a typed error.
-8. Message acknowledgement belongs to the consumer, not the DTO/publisher.
+5. A publish operation must return success or raise a typed error.
+6. Message acknowledgement belongs to the consumer, not the DTO/publisher.
 
-## 1. Files to Read
+## 1. Scoped Sources
 
 Primary:
 
@@ -131,7 +149,7 @@ arguments remain compatible.
 `CoreConfig.ready()` only constructs and discards an `MQConfig`; it does not
 initialize exchanges/queues and does not create a shared publisher.
 
-## 4. Publisher Contract
+## 4. Observed Publisher Contract
 
 ### 4.1 Low-level `publish()`
 
@@ -209,7 +227,7 @@ exchange available.
 Migration instruction: treat the intended named exchange as the contract;
 characterize actual broker behavior of `exchange=None` but do not reproduce it.
 
-## 5. Routing Contracts
+## 5. Observed Routing Contracts
 
 ### 5.1 Server to device
 
@@ -254,7 +272,7 @@ Routing key is exactly `internal`; event identity is carried in headers.
 - Queue-stage and device-topic vocabularies are plain strings with no shared
   validated routing object.
 
-## 6. Packet DTOs
+## 6. Observed Packet DTOs
 
 File: `packets.py`
 Library: Pydantic v2
@@ -327,7 +345,7 @@ Protocol gaps:
 - Packet type fields are ordinary strings with defaults, not `Literal`, so a
   caller can override a subclass command with an inconsistent value.
 
-## 7. Event DTOs
+## 7. Observed Event DTOs
 
 File: `events.py`
 
@@ -471,32 +489,11 @@ No tests cover:
 - body overriding event headers
 - static/DB topic divergence
 
-## 12. Target Transport Boundaries
+## 12. Candidate Target Mapping: Superseded One-Worker Option
 
-Target shape for one Python async worker:
+This one-worker layout is superseded. The accepted target uses separate runtime processes from `10-target-architecture.md`.
 
-```text
-transport/
-  rabbitmq.py          # async connection, channels, topology, consume/publish
-  routing.py           # validated route objects and routing-key codec
-  packets.py           # immutable device protocol DTOs
-  events.py            # immutable internal event DTOs
-  outcomes.py          # success/discard/retry/dead-letter
-
-services/
-  ingress.py
-  alert_state_machine.py
-  device_events.py
-  device_configuration.py
-
-repositories/
-  keepalive.py
-  alert.py
-  device.py
-  stream.py
-```
-
-Required transport interface:
+Reusable transport interface candidate:
 
 ```text
 connect() -> initialized shared transport
@@ -505,24 +502,16 @@ publish(exchange, route, message) -> success or typed exception
 close()
 ```
 
-Do not create a new broker connection/config object for each domain publish.
-The worker supervisor should own transport lifecycle and inject a publisher
-port into handlers/services.
+Each runtime process owns one initialized transport lifecycle and injects publisher/consumer ports. Domain services do not construct broker connections.
 
-## 13. Migration Order
+## 13. Roadmap Mapping
 
-1. Add wire-level characterization tests for packets and events.
-2. Add topology tests for exact exchanges, queues, and bindings.
-3. Make `get_interface()` initialization defect visible with a failing test.
-4. Define canonical routing DTOs and reject invalid segments.
-5. Replace publish catch-and-log with typed outcomes/errors.
-6. Create one initialized transport lifecycle per worker process.
-7. Inject publisher ports; stop constructing transport in models/services.
-8. Remove publishing from Django model `save()` methods.
-9. Separate event contexts from event DTOs.
-10. Introduce async consumers with queue-specific QoS and bounded concurrency.
-11. Add retry/dead-letter/idempotency policy before enabling parallel handling.
-12. Preserve legacy routing keys until all device clients are migrated.
+`20-migration-roadmap.md` owns order. Map these concerns into P1 transport foundations, P4 reliability, P6 device work, or P7 cleanup.
+
+- P1: characterize wire/topology, expose initialization failures, define routing DTOs, and establish one transport lifecycle per process.
+- P4: make publish/settlement outcomes explicit and introduce reliable queues without changing legacy device routes.
+- P6: migrate remaining device consumers while preserving packet compatibility.
+- P7: remove model-save publication, duplicate transport definitions, and legacy context ownership after parity.
 
 ## 14. Minimum Characterization Tests
 
@@ -540,16 +529,18 @@ port into handlers/services.
 - Invalid and DB-configured device topics.
 - Publisher lifecycle and graceful shutdown.
 
-## 15. Do-Not-Lose Contracts
+## 15. Unverified / Decision Required
+
+- Confirm deployed smart-client dependency on the current CUP configuration hash before preserving or versioning it.
+- Confirm which internal queue prefixes remain cross-process compatibility boundaries during each cutover.
+
+## 16. Confirmed Do-Not-Lose Contracts
 
 - External device routes remain dot-separated.
 - Device ingress remains `ask.<type>.<uid>.<packet>`.
 - Server delivery remains `<type>.<uid>.<packet>`.
-- Internal queue prefixes remain `internal`, `state_update`, and
-  `client_update` during compatibility migration.
 - PING body contains server timestamp.
-- CUP carries timestamp and `datahold`; smart CUP carries configuration hash if
-  clients depend on it.
+- CUP carries timestamp and `datahold`.
 - Internal event identity/source remain available to domain handlers.
 - Device events retain device type/UID addressing.
 - RabbitMQ queues remain durable while they are cross-process boundaries.

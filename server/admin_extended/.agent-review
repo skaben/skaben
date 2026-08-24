@@ -1,16 +1,34 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:123cca46e376d27168058f2cf9b36237ac6f32a9cd79559f0346942dab49c50a
+scope:
+  - server/admin_extended/**
+parent: server/.agent-review
+read_when:
+  - changing CSV import, admin routes, import validation, or user/access persistence
+target_authority:
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P2, P6, P7]
+---
 # AGENT REFERENCE: ADMIN EXTENDED
 
-Reviewed: 2026-08-24
-Scope: `server/admin_extended` and direct dependencies
-Purpose: behavior map for preserving the operator CSV user-import contract during repair or migration
+## Quick Context
+
+- Responsibility: preserve intended operator CSV format while documenting currently unreachable routes and unsafe persistence.
+- Confirmed contracts: semicolon fields, string access codes, uniqueness, staff/CSRF intent, and downstream ownership require preservation.
+- Top defects: unreachable routes, unbounded synchronous parsing, partial writes, weak validation, and no audit/idempotency.
+- Target disposition: admin app owns protected upload UX/parser; behavior domain owns user/access persistence.
+- Read next: load behavior review for any persistence or duplicate-policy change.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Treat `server/admin_extended`, its custom-admin registration, and persistence models as authoritative; use templates and examples as supporting evidence.
-3. Preserve confirmed CSV and data contracts, not unreachable routing, partial imports, uncaught failures, or accidental security behavior.
-4. Keep HTTP/admin transport, file parsing, row validation, import policy, persistence, and reporting separate.
-5. Make authorization, atomicity, duplicate policy, file limits, row ordering, and failure reporting explicit.
+1. Treat `server/admin_extended`, its custom-admin registration, and persistence models as authoritative; use templates and examples as supporting evidence.
+2. Preserve confirmed CSV and data contracts, not unreachable routing, partial imports, uncaught failures, or accidental security behavior.
+3. Keep HTTP/admin transport, file parsing, row validation, import policy, persistence, and reporting separate.
+4. Make authorization, atomicity, duplicate policy, file limits, row ordering, and failure reporting explicit.
 
 ## 1. Sources
 
@@ -100,7 +118,7 @@ John Doe;Awesome user;1234
 Jane Smith;Cool user;6789
 ```
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### `CSVUploadForm`
 
@@ -188,7 +206,9 @@ Jane Smith;Cool user;6789
 - Reporting: no created/skipped/failed count, row-number error, downloadable failure report, audit record, or persistent import identity exists.
 - Defects: unreachable routes, nonexistent template URL name/namespace, uncaught post-validation errors, non-atomic partial writes, possible orphan users, zero-row success, unbounded all-user result, and no redirect-after-post.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. Admin owns protected UI/parsing; the behavior domain owns user/access persistence.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -199,7 +219,9 @@ Jane Smith;Cool user;6789
 | `UserImportRecord` | Persist operator, source metadata, checksum, counts, timestamps, and outcome | Avoid storing raw sensitive file unless required and protected |
 | `ExampleCSVResponse` | Serve versioned example matching accepted schema | Named protected route; semicolon and encoding contract explicit |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. Map characterization to P0, secure admin foundations to P2, safe import implementation to P6, and cleanup to P7. Register routes only after validation, authorization, and persistence safety exist.
 
 1. Characterize intended route/path, admin permission, example format, successful import, and every validation/persistence failure.
 2. Register named admin-site routes and fix template reversal without changing import semantics.
@@ -220,14 +242,16 @@ Jane Smith;Cool user;6789
 - Concurrent duplicate uploads and idempotent retry/refresh behavior.
 - Exact preservation of user/code relationships and no unintended permissions or terminal accounts.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Decide duplicate/update/skip behavior, normalization, empty-file handling, size/row limits, and atomicity before route activation.
+- Confirm intended admin route names, active-staff/CSRF enforcement, and operator result-reporting requirements.
+
+## 11. Confirmed Do-Not-Lose
 
 - CSV logical fields: `user_name`, `user_description`, and `access_code`.
 - Semicolon-delimited example and parser compatibility until operators receive a versioned replacement.
 - Access codes stored as strings so leading zeroes and card identifiers survive import.
 - One access-code owner relationship and existing unique user-name/code constraints.
-- Active-staff authorization and CSRF protection intended by `admin_site.admin_view()`.
-- Operator-visible validation errors and explicit success/failure counts in repaired flow.
+- Operator-visible validation errors.
 - Existing downstream compatibility: imported users may own access codes and terminal accounts; imported codes may receive lock permissions and are looked up by exact value.
-
-<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->

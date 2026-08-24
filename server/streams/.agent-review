@@ -1,17 +1,34 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:b6adb76166bba8660edca808f0a539ea51ec9ed1125129ee5f776156472b66e7
+scope:
+  - server/streams/**
+parent: server/.agent-review
+read_when:
+  - changing stream persistence, history queries, log events, retention, or stream migration
+target_authority:
+  - .agents/plans/40-game-events-and-rabbitmq.md
+roadmap_phases: [P2, P4, P5, P7]
+---
 # AGENT REFERENCE: STREAMS
 
-Reviewed: 2026-08-24
-Scope: `server/streams` and direct dependencies
-Purpose: behavior map for preserving event-stream and operational-log contracts during repair or migration
+## Quick Context
+
+- Responsibility: preserve legacy StreamRecord identity, fields, queries, and log-ingestion behavior during replacement.
+- Confirmed contracts: UUID, raw timestamp, message/data, stream/source/mark, and conventional values require migration accounting.
+- Top defects: public mutable history, missing IDs in API, unstable order, dropped severity, unbounded queries, and no retention.
+- Target disposition: generic streams are transitional; central plan owns separate game history, projections, audit, and operational logging.
+- Read next: load event-context or transport reviews only for matching conditional routes in `.agents/context-routing.yml`.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/event_contexts/.agent-review` before changing this area.
-3. Treat model, serializer, event encoding, worker persistence, and message settlement as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
-4. Preserve confirmed record fields, log source/level semantics, stream names, and chronological presentation, not public mutation, hidden identity, lost severity, unstable ordering, or accidental ACK-on-failure behavior.
-5. Keep event DTOs, append persistence, query API, administration, retention, redaction, and worker settlement separate.
-6. Make occurrence/recording time, ordering, immutability, validation, idempotency, concurrency, retries, retention, and access control explicit.
+1. Treat model, serializer, event encoding, worker persistence, and message settlement as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
+2. Preserve confirmed record fields, log source/level semantics, stream names, and chronological presentation, not public mutation, hidden identity, lost severity, unstable ordering, or accidental ACK-on-failure behavior.
+3. Keep event DTOs, append persistence, query API, administration, retention, redaction, and worker settlement separate.
+4. Make occurrence/recording time, ordering, immutability, validation, idempotency, concurrency, retries, retention, and access control explicit.
 
 ## 1. Sources
 
@@ -157,7 +174,7 @@ admin stream list
 
 Admin and API use opposite default chronology: admin newest first, API oldest first. Both orders are ambiguous for records sharing a timestamp. Admin registration passes redundant `base_site` as a model-admin option even though registration is already invoked on `base_site`.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### Stream record persistence
 
@@ -280,31 +297,25 @@ Admin and API use opposite default chronology: admin newest first, API oldest fi
 - Operations: no indexes, pagination, retention, partitioning, archival, payload limits, correlation fields, volume metrics, or redaction controls.
 - Evidence: generated schema confirms writable timestamp/content and missing UUID; fixture has zero stream rows and cannot characterize deployed data.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
 
-| Target component | Responsibility | Constraints |
+Non-authoritative transitional mapping. `40-game-events-and-rabbitmq.md` replaces the generic stream target with separate history, projection, audit, and operational-log ownership.
+
+| Legacy concern | Authoritative target | Disposition |
 | --- | --- | --- |
-| `StreamEvent` DTO | Own versioned event/log wire fields and complete header decoding | preserve source/level/save; add event/correlation/occurrence IDs compatibly |
-| `StreamTaxonomy` | Define stream, source, mark/severity rules | preserve `game`, `log`, and current level strings; controlled extensions |
-| `StreamAppendRepository` | Validate and append immutable records | database-generated recorded time/sequence, idempotency, no serializer coupling |
-| `OperationalLogAdapter` | Convert worker/context logs to append commands | same path for inline and broker logs; explicit best-effort/required policy |
-| `GameEventRecorder` | Record durable game/audit events | actor/correlation/causation and transaction/outbox policy |
-| `StreamQueryService` | Authorized indexed filtering and stable pagination | read-only UUID DTO, time ranges, cursor order, bounded payload |
-| `StreamRetentionService` | Archive/delete/redact according to policy | legal/audit exceptions, metrics, recoverability, actor trail |
-| `StreamAdminAdapter` | Investigate/export/correct without in-place history rewrite | correction/tombstone events, restricted roles, audit actor |
-| `InternalEffectOutbox` | Decouple required records/follow-ups from source ACK | retry, DLQ, poison isolation, observable status |
+| `stream="game"` records | `GameSession`/`GameEvent` history | migrate only records with sufficient semantics; otherwise archive |
+| `stream="log"` records | operational logging or audit, by classification | preserve fields for migration; do not build a new generic stream store |
+| REST/admin query surface | projection admin or temporary compatibility reader | retain only for a P0-verified consumer with removal gate |
+| core-owned log DTO/persistence | owning event/audit/log boundary | migrate in P4/P5; remove legacy re-export in P7 |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
 
-1. Characterize deployed stream values, UI queries, volume, sensitive data, severity/source strings, ordering ties, duplicates, and worker settlement behavior.
-2. Lock down stream API/admin; make API read-only for normal consumers and stop anonymous history access/mutation.
-3. Add UUID to read DTO, stable indexed pagination, valid search/filter fields, and explicit time-range/default order.
-4. Fix complete event-header decoding so broker and inline log paths preserve identical severity/source/save semantics.
-5. Introduce one validated append repository with recorded time, optional occurred time, ingestion sequence, event/correlation IDs, and typed outcomes.
-6. Define operational-log versus durable game/audit reliability; move required effects to transaction/outbox and make best-effort loss observable.
-7. Migrate taxonomy/null semantics, add indexes and payload limits, and preserve legacy records without rewriting evidence silently.
-8. Add retention, archival, redaction, export, reconciliation, volume/error metrics, and audited correction/tombstone workflows.
-9. Move DTO ownership into streams and remove legacy serializer-backed `write_event()`/re-export only after callers and compatibility are verified.
+`20-migration-roadmap.md` owns order. Map consumer proof/security to P0/P2, reliability to P4, history migration to P5, and stream removal to P7.
+
+- P0/P2: characterize readers/data and prevent anonymous mutation; add compatibility query work only for a verified consumer.
+- P4: preserve event/log fields while establishing reliable event and audit boundaries.
+- P5: migrate/archive legacy records and build authorized projections according to `40-game-events-and-rabbitmq.md`.
+- P7: remove generic stream APIs, serializer-backed writes, and DTO re-exports after reader/data reconciliation.
 
 ## 9. Minimum Tests
 
@@ -323,17 +334,19 @@ Admin and API use opposite default chronology: admin newest first, API oldest fi
 - Payload size, sensitive-field redaction, retention expiry, archive restore, legal hold, and audited tombstone/correction.
 - Query plan/index tests for common timestamp/stream/source/mark filters at expected production volume.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Decide whether `save=false` is a supported compatibility contract or dead behavior.
+- Confirm whether log-before-follow-up ordering is semantically required.
+- Define null-versus-empty `message_data`, legacy taxonomy handling, and any temporary stream reader before P5.
+- Define required observability, retention, redaction, and correction outcomes in the owning P5 work package.
+
+## 11. Confirmed Do-Not-Lose
 
 - Existing random record UUIDs and their role as stable record identity, even though current API fails to expose them.
 - Raw epoch timestamp, full message, JSON message data, stream, source, and mark fields for legacy records.
-- Conventional stream names `game` and `log` and level/mark values `info`, `log`, and `error` where consumers depend on them.
+- Conventional stream names `game` and `log` plus legacy level/mark values `info`, `log`, and `error` present in stored records.
 - Current context-derived source names and worker source naming until query/UI migration is verified.
-- `save=false` ability to suppress persistence, with explicit discard behavior rather than accidental fallthrough.
 - Chronological query capability and timezone-aware `human_time` compatibility where UI depends on `HH:MM:SS`.
 - Inline context log creation and worker-generated log ingestion, converging on one severity-preserving append path.
-- Log-before-follow-up ordering where proven semantically required; otherwise migrate with explicit effect policy.
 - Arbitrary legacy JSON payload readability while introducing versioned validation for new writes.
-- Required observability of persistence, retry, discard, retention, redaction, and mutation/correction outcomes.
-
-<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->

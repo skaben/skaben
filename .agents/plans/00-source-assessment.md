@@ -1,8 +1,10 @@
 # Migration Source Assessment
 
-Reviewed: 2026-08-24
-Status: accepted planning input
-Depends on: current `server/**/.agent-review` files
+Reviewed: 2026-08-25
+Status: accepted
+Role: planning input
+Derived from: current-state reviews routed by `../context-routing.yml`
+Required implementation context: `README.md` plus the route selected by `../context-routing.yml`
 
 ## 1. Source Priority
 
@@ -10,14 +12,16 @@ Depends on: current `server/**/.agent-review` files
 | --- | --- | --- |
 | 1 | Current SKABEN code and migrations | authoritative observed behavior and data contracts |
 | 2 | Current `server/**/.agent-review` | reviewed flow, failure, compatibility, and gap map |
-| 3 | `skb_refactored/app` | tested extraction patterns and alert behavior candidate |
-| 4 | `skb_refactored/server-middle` | frozen legacy comparison snapshot only |
-| 5 | `skb_refactored/.agents/plans` | historical design intent; selectively adopted |
-| 6 | `/home/zerthmonk/projects/template` | target engineering conventions; selectively adopted |
+| 3 | `refactor_reference/app` | tested extraction patterns and alert behavior candidate |
+| 4 | `refactor_reference/server-middle` | frozen legacy comparison snapshot only |
+| 5 | `refactor_reference/.agents/plans` | historical design intent; selectively adopted |
+| 6 | `template` | target engineering conventions; selectively adopted |
 
 Do not use `server-middle` as a source of newer behavior. It is nearly a copy of the legacy server created during the alert experiment. The partially migrated `app` still imports active legacy models through `PYTHONPATH=server`.
 
-## 2. Useful History from `skb_refactored`
+`refactor_reference` and `template` resolve through the canonical source registry in `README.md`.
+
+## 2. Useful History from `refactor_reference`
 
 The partial migration was produced in three commits on 2026-07-12:
 
@@ -27,7 +31,7 @@ The partial migration was produced in three commits on 2026-07-12:
 
 This concentrated history makes it a prototype rather than a deployment-proven branch. Reuse design and tests after checking them against current code; do not merge the branch wholesale.
 
-## 3. Adopt from `skb_refactored`
+## 3. Adopt from `refactor_reference`
 
 | Candidate | Why useful | Target use |
 | --- | --- | --- |
@@ -42,7 +46,7 @@ This concentrated history makes it a prototype rather than a deployment-proven b
 | DRF-free worker settings | Proves worker runtime need not load HTTP stack | settings profiles or common settings without DRF |
 | Explicit Rabbit initialization at startup | Avoids broker work in `AppConfig.ready()` | infrastructure bootstrap rule |
 
-## 4. Adapt from `skb_refactored`
+## 4. Adapt from `refactor_reference`
 
 | Candidate | Problem in prototype | Required adaptation |
 | --- | --- | --- |
@@ -57,7 +61,7 @@ This concentrated history makes it a prototype rather than a deployment-proven b
 | Stream repository | Persists only operational logs in generic stream table | replace with game-event/outbox/projection boundaries |
 | Test suite | Strong units but mocked publication and incomplete failure coverage | add integration, settlement, concurrency, rollback, and wire tests |
 
-## 5. Reject from `skb_refactored`
+## 5. Reject from `refactor_reference`
 
 - Running narrow consumers on broad shared queues.
 - Acknowledging unsupported or failed internal messages unconditionally.
@@ -93,7 +97,7 @@ This concentrated history makes it a prototype rather than a deployment-proven b
 
 ## 8. Historical Plan Triage
 
-| `skb_refactored` plan | Disposition |
+| `refactor_reference` plan | Disposition |
 | --- | --- |
 | Architecture audit | Retain findings already covered by current `.agent-review`; current reviews take precedence |
 | P0 runtime/tooling | Adopt supported `uv`, split runtime/tooling commands, smoke checks, and discoverable workflow |
@@ -106,4 +110,3 @@ This concentrated history makes it a prototype rather than a deployment-proven b
 ## 9. Main Lesson
 
 The partial repository proves alert logic can be separated without moving legacy tables first. It also proves that code extraction and runtime cutover are different operations. Future slices may copy the extraction technique, but a runtime process must not replace its legacy counterpart until queue, packet, settlement, scheduler, admin, and side-effect parity are complete.
-

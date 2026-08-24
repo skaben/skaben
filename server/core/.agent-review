@@ -1,21 +1,40 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:2755f0430082c0d352b13e3e0a6393d348407cb1e3fa949e7fac44f66e15031f
+scope:
+  - server/core/**
+parent: server/.agent-review
+read_when:
+  - changing shared core models, operations, settings, or process entrypoints
+target_authority:
+  - .agents/plans/10-target-architecture.md
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+---
 # AGENT REFERENCE: LEGACY CORE MAP
 
-Reviewed: 2026-08-24
-Scope: `server/core` cross-cutting structure and process boundaries
-Purpose: shared project-structure notes for legacy-core migration reviews
+## Quick Context
+
+- Responsibility: map cross-cutting core models, operations, utilities, and process boundaries.
+- Confirmed contracts: configured device topics, normalized keepalive identity, legacy task hashes, and management commands remain compatibility inputs.
+- Top defects: eager transport startup, mutating health checks, ineffective HTTP authorization, recursive DB wait, and singleton conventions without constraints.
+- Target disposition: shrink core to shared infrastructure; domain rules move to owning slices.
+- Read next: use `.agents/context-routing.yml`; load transport, workers, or scheduler only when their paths/contracts change.
 
 ## 0. Agent Rules
 
 1. Treat `server/` as the source of current production behavior.
 2. Do not infer legacy behavior from `app/` or docs alone.
 3. Code is authoritative when it conflicts with `docs/`.
-4. Read this file before area-specific reviews in `server/core/**/.agent-review`.
-5. Preserve explicit contracts; do not preserve accidental failure behavior.
-6. Keep transport, scheduling, domain decisions, persistence, and side
+4. Preserve explicit contracts; do not preserve accidental failure behavior.
+5. Keep transport, scheduling, domain decisions, persistence, and side
    effects separate in migrated code.
-7. Treat Django management commands as process boundaries with their own
+6. Treat Django management commands as process boundaries with their own
    runtime state.
-8. Use tests and docs as supporting evidence after code.
+7. Use tests and docs as supporting evidence after code.
 
 ## 1. Project Structure
 
@@ -47,14 +66,9 @@ Each process initializes its own Python runtime, Redis client access, and
 RabbitMQ-facing objects. Shared behavior is coordinated through broker state,
 database state, and Redis state rather than in-process singletons.
 
-## 3. Reading Order
+## 3. Context Routing
 
-1. Read this shared core map.
-2. Read the area-specific `.agent-review` for the package you are changing.
-3. Read the matching management command entrypoint.
-4. Read transitive domain dependencies in `event_contexts/`, `alert/`, and
-   `peripheral_devices/`.
-5. Use tests and docs to confirm assumptions, not to replace code reading.
+`.agents/context-routing.yml` is the sole context-selection source; this parent review adds no implicit child or sibling dependencies.
 
 ## 4. Remaining Core Ownership
 
@@ -74,7 +88,7 @@ database state, and Redis state rather than in-process singletons.
 startup. Importing or booting Django therefore reaches the transport
 configuration layer before a worker or scheduler command begins its own work.
 
-## 5. Core Data and Side-effect Contracts
+## 5. Observed Core Data and Side-effect Contracts
 
 1. `DeviceTopic.channel` is the canonical configured device topic. `simple`,
    `smart`, and `all` are virtual selectors owned by `DeviceTopicManager`, not

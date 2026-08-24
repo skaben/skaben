@@ -1,23 +1,42 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:afeb72d815a07357b37a6aa53defd070c3c0d55c5295ee65fc6e5225404ebd55
+scope:
+  - server/core/worker_queue_handlers/**
+  - server/core/management/commands/start_worker.py
+parent: server/core/.agent-review
+read_when:
+  - changing worker routing, handler effects, queue settlement, or worker startup
+target_authority:
+  - .agents/plans/10-target-architecture.md
+  - .agents/plans/40-game-events-and-rabbitmq.md
+roadmap_phases: [P1, P4, P6, P7]
+---
 # AGENT REFERENCE: LEGACY WORKER QUEUES
 
-Reviewed: 2026-08-24
-Scope: `server/core/worker_queue_handlers` and direct dependencies
-Purpose: behavior map for migration into the modern Django template
+## Quick Context
+
+- Responsibility: canonical current reference for handler routing, local effects, and message settlement.
+- Confirmed contracts: first-packet CUP behavior, SUP no-echo persistence, alert fanout, lock ACL, and legacy queue names require characterization.
+- Top defects: broad queues, unconditional ACK paths, no retry/DLQ/idempotency, and interleaved DB/publication work.
+- Target disposition: responsibilities move to separate ingress, domain, state, and delivery processes; one-worker option below is superseded.
+- Read next: load transport review only for wire/topology changes selected by `.agents/context-routing.yml`.
 
 ## 0. Agent Rules
 
-1. Read `server/core/.agent-review` first.
-2. Read this file before changing worker, transport, alert, or device code.
-3. Treat `server/core/worker_queue_handlers` as the source of current worker
+1. Treat `server/core/worker_queue_handlers` as the source of current worker
    behavior.
-4. Preserve behavior intentionally; do not copy accidental failure behavior.
-5. Keep transport, domain decisions, persistence, and side effects separate in
+2. Preserve behavior intentionally; do not copy accidental failure behavior.
+3. Keep transport, domain decisions, persistence, and side effects separate in
    new code.
-6. Do not rely on Django model `save()` side effects in migrated code.
-7. Do not acknowledge a message until all required effects have succeeded.
-8. Preserve per-device ordering and serialize global alert transitions.
+4. Do not rely on Django model `save()` side effects in migrated code.
+5. Do not acknowledge a message until all required effects have succeeded.
+6. Preserve per-device ordering and serialize global alert transitions.
 
-## 1. Files to Read
+## 1. Scoped Sources
 
 Primary:
 
@@ -150,7 +169,7 @@ Critical publish behavior:
 or return failure. A caller usually acknowledges its source message even when
 the required publish failed.
 
-## 5. Worker Contracts
+## 5. Observed Worker Contracts
 
 ### 5.1 AskHandler
 
@@ -382,48 +401,25 @@ Migration requirement: replace this implicit matrix with named outcomes such as
 - Docs say SUP may trigger INFO behavior; current state worker only updates DB.
 - Docs describe PONG handling, but `InternalHandler` rejects PONG after ingress.
 
-## 9. Target: One Python Async Worker
+## 9. Candidate Target Mapping: Superseded One-Worker Option
 
-Use one supervised process, but keep four logical lanes:
+This one-worker option is superseded. Map observed responsibilities onto separate processes from `10-target-architecture.md`:
 
-| Lane | Responsibility | Concurrency/order |
-| --- | --- | --- |
-| ingress | decode, keepalive, normalize | high priority; serial per device |
-| domain | INFO/events, alert/device decisions | global alert serial; per-device serial |
-| persistence | validate SUP, direct DB update | bounded; serial per device |
-| delivery | build config, MQTT CUP | bounded; broadcast cannot block ingress |
+| Observed responsibility | Target process |
+| --- | --- |
+| decode, keepalive, normalize | `mqtt_ingress` |
+| INFO/domain command execution | `domain_worker` |
+| SUP validation and persistence | `state_ingress` |
+| CUP/configuration construction and delivery | `device_delivery` |
 
-Do not convert each legacy class directly into a large async callback.
+## 10. Roadmap Mapping
 
-Target components:
+`20-migration-roadmap.md` owns order. Map these concerns into P1 worker foundations, P4 reliability/cutover, P6 remaining devices, or P7 cleanup.
 
-```text
-worker supervisor
-  transport.rabbitmq consumer/publisher
-  transport message DTOs and routing
-  services.ingress
-  services.alert_state_machine
-  services.device_events
-  services.device_configuration
-  repositories.keepalive
-  repositories.alert
-  repositories.device_state
-  repositories.stream
-  message outcome/retry/idempotency policy
-```
-
-## 10. Migration Order
-
-1. Add characterization tests for every flow in section 3.
-2. Make publish success/failure observable.
-3. Define explicit ack/retry/dead-letter outcomes.
-4. Extract model reads/writes into repositories.
-5. Remove MQ publishing from model `save()` paths.
-6. Extract alert/device decisions into services/state machines.
-7. Run the legacy queues through new handlers without changing routing keys.
-8. Introduce one async supervisor with bounded logical lanes.
-9. Only then decide whether `state_update` and `client_update` remain durable
-   RabbitMQ queues or become in-process commands.
+- P1: characterize every current flow and expose publish/settlement outcomes.
+- P3/P4: extract alert decisions, preserve legacy routes during reliable-queue cutover, and move alert ownership to its service.
+- P6: extract remaining device persistence/delivery responsibilities into their target processes.
+- P7: remove model-save publication and superseded handlers after entrypoint parity.
 
 ## 11. Minimum Characterization Tests
 
@@ -440,14 +436,16 @@ worker supervisor
 - Client: override, equal hash, forced update, missing lock/terminal.
 - Every worker: publish failure, DB failure, exact message settlement.
 
-## 12. Do-Not-Lose Behavioral Boundaries
+## 12. Unverified / Decision Required
 
-- First packet from a new/stale device requests CUP instead of continuing.
+- Confirm whether current first-packet CUP replacement remains required for every deployed client.
+- Define global-alert and per-device ordering mechanisms in their owning slice work packages.
+
+## 13. Confirmed Do-Not-Lose Behavioral Boundaries
+
 - Incoming SUP persistence must not automatically echo configuration to MQTT.
 - Alert transitions fan out client updates to active device topics.
 - Scale updates include counter, state, and three computed borders.
 - Lock config includes ACL state mappings.
 - Unknown locks/access cards may be registered only in `white` state.
 - Power-shield events control transitions out of blue/cyan pre-game states.
-- Global alert transitions must not race.
-- Per-device SUP/CUP/INFO ordering must not race.

@@ -1,17 +1,35 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:6857a1979500bcf78acfb5717b01afd77ca60e3c0bd2d89ef5727b4ab07abc40
+scope:
+  - server/peripheral_devices/**
+parent: server/.agent-review
+read_when:
+  - changing device identity, liveness, desired/reported state, configuration, or delivery
+target_authority:
+  - .agents/plans/10-target-architecture.md
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P2, P4, P6, P7]
+---
 # AGENT REFERENCE: PERIPHERAL DEVICES
 
-Reviewed: 2026-08-24
-Scope: `server/peripheral_devices` and direct dependencies
-Purpose: behavior map for preserving device identity, configuration, liveness, and synchronization contracts during repair or migration
+## Quick Context
+
+- Responsibility: preserve smart/passive device identity, configuration, liveness, CUP/SUP, and synchronization behavior.
+- Confirmed contracts: MQTT addressing, persisted IDs/MACs, lock payloads, no-echo SUP, and passive payloads require client compatibility tests.
+- Top defects: save-triggered publication, side-effecting liveness reads, incomplete terminal wire support, weak validation, and untracked fanout failures.
+- Target disposition: separate identity/state services from projection and delivery; generic writable REST is transitional.
+- Read next: use behavior, assets, or transport conditionals from `.agents/context-routing.yml`.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, `server/alert/.agent-review`, `server/event_contexts/.agent-review`, and `server/peripheral_behavior/.agent-review` before changing this area.
-3. Treat model, schema, packet, worker settlement, and database behavior as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
-4. Preserve confirmed MQTT routing, CUP/SUP payloads, lock ACL, liveness, override, and client projection contracts, not stale hashes, false online state, public mutation, or swallowed delivery failures.
-5. Keep device persistence, desired-state projection, reported-state ingestion, liveness, transport publishing, API/admin adapters, and passive-device configuration separate.
-6. Make identity normalization, ordering, concurrency, transactions, retries, settlement, idempotency, destructive cascades, and delivery status explicit.
+1. Treat model, schema, packet, worker settlement, and database behavior as authoritative; use generated OpenAPI, fixtures, tests, and docs as supporting evidence.
+2. Preserve confirmed MQTT routing, CUP/SUP payloads, lock ACL, liveness, override, and client projection contracts, not stale hashes, false online state, public mutation, or swallowed delivery failures.
+3. Keep device persistence, desired-state projection, reported-state ingestion, liveness, transport publishing, API/admin adapters, and passive-device configuration separate.
+4. Make identity normalization, ordering, concurrency, transactions, retries, settlement, idempotency, destructive cascades, and delivery status explicit.
 
 ## 1. Sources
 
@@ -193,7 +211,7 @@ save lock/terminal form
 
 Lock inline ACL changes affect the lock checksum and normally trigger the second CUP. Terminal assignment state-only changes do not affect terminal checksum and can be missed. Passive-config edits do not schedule simple-device refresh. Deletion has no device reconciliation path.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### Smart-device identity and base state
 
@@ -370,7 +388,9 @@ Lock inline ACL changes affect the lock checksum and normally trigger the second
 - Evidence: fixture contains five locks, no terminals, eleven passive configs, five configured topics with terminal absent and box inactive, and twenty-two keepalive rows. It is supporting evidence only and was already modified at review time.
 - Verification: Django runtime checks could not run in the current workspace because the existing virtual environment lacks `rest_framework`; static artifact checks remain available.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. Central architecture and roadmap own process topology and phase order; generic writable REST is transitional.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -387,7 +407,9 @@ Lock inline ACL changes affect the lock checksum and normally trigger the second
 | `DeviceApi` | Authorized read projections and explicit mutation commands | separate registration/update/delete DTOs, optimistic revision, accurate schema |
 | `DeviceAdminAdapter` | Human operations over the same services | impact preview, actor audit, one committed projection/refresh per change |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. Map security decisions to P2, delivery reliability to P4/P6, device slices to P6, and cleanup to P7.
 
 1. Characterize deployed lock CUP, inbound SUP, client hash, MAC normalization, liveness, override, API, admin, and worker settlement behavior with real-client fixtures.
 2. Lock down device and bulk-update endpoints; split device/operator read and write DTOs; stop exposing plaintext terminal credentials broadly.
@@ -417,18 +439,20 @@ Lock inline ACL changes affect the lock checksum and normally trigger the second
 - Admin parent plus inline edit creates one canonical post-commit refresh containing final ACL/account-state data.
 - Existing lock/simple/terminal clients accept routing keys, CUP JSON encoding, `config_hash`, inbound `hash`, alert IDs, merge behavior, and payload schema.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Confirm authoritative terminal CUP/SUP fields and client game behavior before terminal cutover.
+- Decide exact active-topic/override discard reporting and bulk-fanout semantics.
+- Confirm unknown-lock registration compatibility and liveness authority/clock policy.
+- Confirm affected-device refresh expectations for desired-state, ACL, assignment, content, alert, and passive-config changes.
+- Confirm deployed smart-client dependency on `config_hash`/inbound `hash` and derived scale fields.
+
+## 11. Confirmed Do-Not-Lose
 
 - Topic-plus-device UID MQTT addressing: `<topic>.<uid>.<command>`, with broadcast UID `all`.
 - Existing persisted lock/terminal integer IDs, MAC identities, IP/description metadata, and reviewed override semantics.
-- CUP server timestamp/datahold shape and smart `config_hash` compatibility; inbound client comparison field `hash` until protocol migration is verified.
+- CUP server timestamp/datahold shape.
 - Lock datahold fields `alert`, `override`, `sound`, `timer`, `closed`, `blocked`, and ACL map `{access_code: [alert_state_database_ids]}`.
 - Lock reported-state ability to persist client `closed`/`blocked` without an outgoing echo loop.
-- Terminal powered/blocked intent, account/menu projection, account-state availability, and client-compatible game behavior once authoritative transport is confirmed.
-- Passive `pwr` values and `rgb` program payloads from reviewed data, plus derived scale fields `level`, `state`, and `borders` where clients depend on them.
-- Active-topic and override skip policies after their exact discard/reporting semantics are made explicit.
-- Unknown-lock creation only under reviewed management/white-state policy, without duplicate registration or implicit access grants.
-- Online timeout behavior based on trustworthy receive time, without reads creating false liveness.
-- Required, observable affected-device refresh after committed desired-state, ACL, assignment, account/menu, asset, alert, or passive-config changes.
-
-<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->
+- Terminal powered/blocked intent, account/menu projection, and account-state availability.
+- Passive `pwr` values and `rgb` program payloads from reviewed data.

@@ -1,26 +1,44 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:241ffcafd73fdc7ee0cab711c083b59a2af5b7f937707c8ff17ad63774b66adf
+scope:
+  - server/core/scheduler/**
+  - server/core/management/commands/start_scheduler.py
+parent: server/core/.agent-review
+read_when:
+  - changing task cadence, Redis gates, scheduler startup, or alert scheduling
+target_authority:
+  - .agents/plans/20-migration-roadmap.md
+  - .agents/plans/30-alert-pilot.md
+roadmap_phases: [P1, P3, P4, P6, P7]
+---
 # AGENT REFERENCE: LEGACY SCHEDULER
 
-Reviewed: 2026-08-24
-Scope: `server/core/scheduler` and direct dependencies
-Purpose: behavior map for migration into the modern Django template
+## Quick Context
+
+- Responsibility: record current Redis-gated polling, task cadence, and startup-only work.
+- Confirmed contracts: PING cadence, alert timeout source, and startup refresh require characterization before replacement.
+- Top defects: startup wipes shared schedule state, no leader lock, blocking tasks, and process-fatal task errors.
+- Target disposition: scheduler selects due work and enqueues commands; it does not mutate domains or publish device payloads directly.
+- Read next: load alert or transport reviews only for matching conditional routes in `.agents/context-routing.yml`.
 
 ## 0. Agent Rules
 
-1. Read `server/core/.agent-review` first.
-2. Treat `server/core/scheduler` as the source of current scheduler behavior.
-3. Read `server/core/transport/.agent-review` with this file because scheduler
-   tasks publish through the transport layer.
-4. Preserve task cadence and routing only after characterization tests confirm
+1. Treat `server/core/scheduler` as the source of current scheduler behavior.
+2. Preserve task cadence and routing only after characterization tests confirm
    them.
-5. Do not preserve swallowed publish failures, startup Redis wipes, or stale
+3. Do not preserve swallowed publish failures, startup Redis wipes, or stale
    one-shot task records as desired behavior.
-6. Keep schedule calculation, task selection, transport publishing, and domain
+4. Keep schedule calculation, task selection, transport publishing, and domain
    logic separate in migrated code.
-7. A scheduler task should surface success/failure to the caller.
-8. Startup-only orchestration should remain explicit rather than hiding inside
+5. A scheduler task should surface success/failure to the caller.
+6. Startup-only orchestration should remain explicit rather than hiding inside
    generic recurring-task machinery.
 
-## 1. Files to Read
+## 1. Scoped Sources
 
 Primary:
 
@@ -68,7 +86,7 @@ Important process facts:
 - There is no signal handling, graceful drain, or persisted leadership lock.
 - All task execution is inline and blocking.
 
-## 3. Redis Scheduling Contract
+## 3. Observed Redis Scheduling Contract
 
 Redis key:
 
@@ -117,7 +135,7 @@ Task timeout sources:
 - `AlertTask`: `settings.SCHEDULER_TASK_TIMEOUT`
 - `UpdateDevicesOnStartTask`: hard-coded `0`
 
-## 5. Task Contracts
+## 5. Observed Task Contracts
 
 ### 5.1 `PingerTask`
 
@@ -206,3 +224,9 @@ Critical consequences:
    scheduled task.
 6. Task success is inferred from "method returned" rather than confirmed side
    effects.
+
+## 7. Unverified / Decision Required
+
+- Confirm required PING cadence and restart/catch-up semantics from deployed behavior.
+- Decide leadership/lease ownership and durable scheduling semantics in the owning roadmap work package.
+- Confirm whether startup-wide device refresh remains required after delivery reconciliation exists.

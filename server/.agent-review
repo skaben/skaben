@@ -1,17 +1,37 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:36ea62d2da9e9e4218747a1868cb7cb9e1af165b9c76d9cd6efe66c1f964cd1a
+scope:
+  - server/**
+parent: null
+read_when:
+  - entering any server migration area
+  - changing shared runtime or deployment boundaries
+target_authority:
+  - .agents/plans/10-target-architecture.md
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+---
 # AGENT REFERENCE: SERVER PROJECT MAP
 
-Reviewed: 2026-08-24
-Scope: `server` and direct runtime/deployment dependencies
-Purpose: brief project description, structure map, process map, and routing guide for deeper reviews
+## Quick Context
+
+- Responsibility: index current server structure, runtime processes, cross-area flows, and deeper reviews.
+- Confirmed contracts: PostgreSQL identity, MQTT addressing and packet roles, device payloads, and current alert behavior require compatibility evidence before change.
+- Top defects: public mutation, swallowed broker failures, model-save side effects, weak settlement, and mutating health/bootstrap paths.
+- Target disposition: retain modular Django monolith; replace legacy side-effect and API boundaries according to central plans.
+- Read next: select only touched-area routes from `.agents/context-routing.yml`.
 
 ## 0. Rules
 
-1. Read this file before any child `.agent-review` under `server/`.
-2. Read the nearest child review before changing its area; this root map is an index, not a substitute for code inspection.
-3. Treat `server/` code, migrations, worker settlement, and deployment entrypoints as authoritative; use tests, docs, generated schema, and fixtures as supporting evidence.
-4. Preserve confirmed HTTP, database, event, packet, device, and data contracts, not accidental public access, swallowed failures, or model-save side effects.
-5. Keep HTTP/admin adapters, domain rules, persistence, scheduling, transport, device I/O, and operational logging separate.
-6. Make transactions, ordering, concurrency, retries, settlement, startup/shutdown, and external dependencies explicit.
+1. This root map is an index, not a substitute for code inspection.
+2. Treat `server/` code, migrations, worker settlement, and deployment entrypoints as authoritative; use tests, docs, generated schema, and fixtures as supporting evidence.
+3. Preserve confirmed HTTP, database, event, packet, device, and data contracts, not accidental public access, swallowed failures, or model-save side effects.
+4. Keep HTTP/admin adapters, domain rules, persistence, scheduling, transport, device I/O, and operational logging separate.
+5. Make transactions, ordering, concurrency, retries, settlement, startup/shutdown, and external dependencies explicit.
 
 ## 1. Sources
 
@@ -107,7 +127,7 @@ worker/context log event
   -> stream REST/admin query
 ```
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### HTTP/API
 
@@ -164,7 +184,9 @@ worker/context log event
 - Operations: health/readiness, migration order, secret handling, graceful shutdown, data retention, backups, and recovery are not consistently defined.
 - Architecture: domain models frequently publish from `save()`, serializers own persistence behavior, transport failures are unobservable, and cross-app imports blur ownership.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. `10-target-architecture.md` owns target boundaries.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -176,7 +198,9 @@ worker/context log event
 | Blob storage | Durable asset bytes and URLs | transactional staging/cleanup; backend-independent |
 | Query/Operations | Logs, health, metrics, admin workflows | read-only diagnostics, retention, redaction, actor audit |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. The following items are migration concerns to map into its phase work packages, not an independent sequence.
 
 1. Characterize canonical HTTP, alert, MQTT, asset, access, terminal, and logging flows using child reviews and real fixtures.
 2. Secure public endpoints and separate read/write/operator/device DTOs.
@@ -198,15 +222,18 @@ worker/context log event
 - Transaction rollback versus outbox publish; idempotent replay and reconciliation.
 - Startup readiness, migrations, integrity checks, graceful worker/scheduler shutdown, and recovery.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Confirm whether any named operator or device consumer still requires a REST API before preserving an authenticated API surface.
+- Confirm deployed media URL behavior before treating current client-visible URLs as stable.
+
+## 11. Confirmed Do-Not-Lose
 
 - Existing PostgreSQL primary keys, foreign keys, fixture compatibility, and conventional alert state/order identifiers.
 - MQTT routing `<topic>.<uid>.<command>` and established PING/PONG/CUP/SUP/INFO packet roles.
 - Lock ACL wire shape, passive device payloads, and reviewed terminal/menu/account projections.
 - Alert named-state and counter transition rules, including required device refreshes.
-- Asset UUIDs, content relationships, supported media/input/game data, and client-visible URLs after serving policy is fixed.
+- Asset UUIDs, content relationships, and supported media/input/game data.
 - Game-user/access-code uniqueness and permission/state relationships.
 - Stream message/source/mark/data history and severity semantics.
-- Operator ability to inspect/control system through authenticated API/admin with observable outcomes.
-
-<!-- Child `.agent-review` files contain authoritative area detail. Observed behavior is separate from target behavior. -->
+- Operator ability to inspect/control system through authenticated Django admin with observable outcomes.

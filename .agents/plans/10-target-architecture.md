@@ -1,7 +1,8 @@
 # Target Architecture
 
-Reviewed: 2026-08-24
-Status: proposed
+Reviewed: 2026-08-25
+Status: accepted
+Role: target baseline
 Depends on: `00-source-assessment.md`
 
 ## 1. Shape
@@ -49,6 +50,21 @@ PostgreSQL owns committed state and durable session history. RabbitMQ owns async
 | `scheduler` | determine due work and enqueue commands | direct domain mutation or device publication |
 
 Processes may share one image and repository. Separate deployment repositories or microservices are not required.
+
+### 2.1 Worker Executable and Process Isolation
+
+- One worker executable may provide shared bootstrap, connection setup, envelope parsing,
+  handler registration, and a `--role` selector.
+- Each role above remains a separate production process with its own queues, settlement
+  policy, concurrency/prefetch settings, health signal, and graceful shutdown boundary.
+- An `--role all` mode may co-locate roles for development and tests only. Production
+  co-location requires accepted P0 workload evidence plus failure and settlement tests
+  showing that shared capacity and restart scope are safe.
+- RabbitMQ performs responsibility-level routing into dedicated queues; the worker
+  executable must not replace them with one broad catch-all queue.
+- Do not create a generic persistence worker for authoritative state. Domain workers own
+  state, required audit/domain records, and outbox creation in one transaction; only
+  idempotent, rebuildable projections use separate persistence consumers.
 
 ## 3. Code Boundaries
 
@@ -198,4 +214,3 @@ Required bootstrap checks:
 - No generic public API.
 - No event-sourced rewrite of all domain state.
 - No schema relocation merely for cosmetic package structure.
-

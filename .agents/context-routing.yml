@@ -1,0 +1,740 @@
+version: 3
+
+work_packages:
+  P0-W1: P0
+  P1-W1: P1
+  P2-W1: P2
+  P2-W2: P2
+  P3-W1: P3
+  P3-W2: P3
+  P4-W1: P4
+  P4-W2: P4
+  P5-W1: P5
+  P5-W2: P5
+  P6-W1: P6
+  P6-W2: P6
+  P6-W3: P6
+  P6-W4: P6
+  P6-W5: P6
+  P6-W6: P6
+  P6-W7: P6
+  P7-W1: P7
+
+rules:
+  authority:
+    path: .agents/plans/README.md
+    sections: [Authority, Task Read Algorithm, Fixed Decisions]
+    phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+  shared_current_context:
+    path: server/.agent-review
+    sections: [Quick Context]
+    phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+  task_read_order:
+    - authority_summary
+    - shared_current_context
+    - active_roadmap_sections
+    - matched_route_required_sections
+    - active_phase_target_sections
+    - triggered_conditional_sections
+  active_roadmap_sections:
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 3. P0 — Baseline and Recovery Safety]
+      phases: [P0]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, "4. P1 — Foundation, Tooling, and Bootstrap"]
+      phases: [P1]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+      phases: [P2]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 6. P3 — Alert Extraction Pilot]
+      phases: [P3]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 7. P4 — Reliable RabbitMQ Boundary and Alert Cutover]
+      phases: [P4]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, "8. P5 — Game History, Player Feed, and Operator Monitoring"]
+      phases: [P5]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+      phases: [P6]
+    - path: .agents/plans/20-migration-roadmap.md
+      sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+      phases: [P7]
+  recursive_plan_dependency_loading: false
+  provenance_is_required_context: false
+  no_wildcard_dependencies: true
+  no_symmetric_review_dependencies: true
+  combine_routes_when_multiple_match: true
+
+coverage:
+  include:
+    - server/*.py
+    - server/**/*.py
+    - server/**/*.html
+    - Makefile
+    - pyproject.toml
+    - uv.lock
+    - docker-compose.yml
+    - docker/**
+    - .github/workflows/**
+    - entrypoint.sh
+    - wsgi.py
+  exclude:
+    - match: server/**/.agent-review
+      when: always
+      reason: reviews are context inputs, not reviewed runtime sources
+    - match: server/__init__.py
+      when: empty_or_comments
+      reason: empty package marker
+    - match: server/**/__init__.py
+      when: empty_or_comments
+      reason: empty package marker
+    - match: server/**/__pycache__/**
+      when: always
+      reason: generated cache
+    - match: server/static/**
+      when: always
+      reason: generated or collected static artifact
+
+context_budgets:
+  - work_package: P3-W1
+    path: server/alert/models.py
+    max_lines: 750
+  - work_package: P4-W2
+    path: server/alert/models.py
+    max_lines: 750
+
+routes:
+  alert:
+    match:
+      - server/alert/**
+    required:
+      - path: server/alert/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P3, P4, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: alert persistence, entrypoint flow, failure outcome, or characterization coverage changes
+        match: []
+        refs:
+          - path: server/alert/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests]
+            phases: [P2, P3, P4, P7]
+      wire_envelope_change:
+        apply_when: alert command or event envelope fields, encoding, schema version, exchange, or routing key changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts, Confirmed Do-Not-Lose Contracts]
+            phases: [P4]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: [1. Objective, 3. Target Components, 4. Preserved Behavior, 5. Pure Decision Contract, "10. Minimum Tests [P3/P4]"]
+        phases: [P3]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: [1. Objective, "6. Application Transaction [P4]", "7. Concurrency Policy [P4]", "8. Entry Adapters [P4]", "9. Domain Events [P4]", "10. Minimum Tests [P3/P4]", "11. Cutover Gate [P4]"]
+        phases: [P4]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: [P4 foundation ownership, "Command envelope [P4]", "4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]", P4 tests, P4 gate]
+        phases: [P4]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P3, P4, P7]
+
+  alert_contexts:
+    match:
+      - server/event_contexts/alert/**
+    required:
+      - path: server/alert/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P3, P4, P7]
+      - path: server/event_contexts/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P3, P4, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: alert context dispatch, generated effects, settlement consequences, or failure outcomes change
+        match: []
+        refs:
+          - path: server/event_contexts/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests]
+            phases: [P3, P4, P7]
+      wire_envelope_change:
+        apply_when: alert context event envelope fields, encoding, header/body ownership, or routing changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Event DTOs, Observed Routing Contracts]
+            phases: [P4]
+    target_plans:
+      - path: .agents/plans/30-alert-pilot.md
+        sections: [1. Objective, 4. Preserved Behavior, 5. Pure Decision Contract, "10. Minimum Tests [P3/P4]"]
+        phases: [P3]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: ["6. Application Transaction [P4]", "8. Entry Adapters [P4]", "9. Domain Events [P4]", "11. Cutover Gate [P4]"]
+        phases: [P4]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["Command envelope [P4]", P4 foundation, "6. Consumer Settlement [P4]"]
+        phases: [P4]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P3, P4, P7]
+
+  event_contexts:
+    match:
+      - server/event_contexts/device/**
+      - server/event_contexts/__init__.py
+      - server/event_contexts/device_update_context.py
+      - server/event_contexts/exceptions.py
+    required:
+      - path: server/event_contexts/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P4, P6, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: device context dispatch, generated effects, persistence consequences, or failure outcomes change
+        match: []
+        refs:
+          - path: server/event_contexts/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests]
+            phases: [P4, P6, P7]
+      alert_effect_change:
+        apply_when: device context can change alert state, counter, reset behavior, or alert-driven effects
+        match: []
+        refs:
+          - path: server/alert/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P4, P6]
+      wire_envelope_change:
+        apply_when: device event envelope fields, encoding, header/body ownership, or routing changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Event DTOs, Observed Routing Contracts]
+            phases: [P4, P6]
+    target_plans:
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["Command envelope [P4]", P4 foundation, "6. Consumer Settlement [P4]"]
+        phases: [P4]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P4, P6, P7]
+
+  core_shared:
+    match:
+      - server/settings.py
+      - server/core/__init__.py
+      - server/core/admin.py
+      - server/core/apps.py
+      - server/core/exceptions.py
+      - server/core/healthcheck.py
+      - server/core/helpers.py
+      - server/core/redis_pool.py
+      - server/core/serializers.py
+      - server/core/tasks.py
+      - server/core/urls.py
+      - server/core/validators.py
+      - server/core/views.py
+      - server/core/models/**
+      - server/core/middleware/**
+      - server/core/management/commands/check_integrity.py
+      - server/core/management/commands/wait_for_db.py
+    required:
+      - path: server/core/.agent-review
+        sections: [Quick Context, Observed Core Data and Side-effect Contracts]
+        phases: [P0, P1, P2, P4, P6, P7]
+    conditional:
+      process_boundary_change:
+        apply_when: process startup, settings, health, shared core ownership, or operational security boundaries change
+        match: []
+        refs:
+          - path: server/core/.agent-review
+            sections: [Runtime Processes, Context Routing, Operations and Security Boundaries]
+            phases: [P1, P2, P4, P6, P7]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 3. P0 — Baseline and Recovery Safety]
+        phases: [P0]
+      - path: .agents/plans/15-foundation-and-tooling.md
+        sections: [1. Objective, 2. Supported Environment, 5. Canonical Commands, 6. Environment Contract, 9. Foundation Exit Criteria]
+        phases: [P1]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 3. Code Boundaries, 5. Transaction Boundary]
+        phases: [P4, P6, P7]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P0, P1, P2, P4, P6, P7]
+
+  foundation_deployment:
+    match:
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - docker-compose.yml
+      - docker/**
+      - .github/workflows/**
+      - entrypoint.sh
+      - wsgi.py
+    required:
+      - path: server/core/.agent-review
+        sections: [Quick Context, Runtime Processes, Operations and Security Boundaries]
+        phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/15-foundation-and-tooling.md
+        sections: [2. Supported Environment, 5. Canonical Commands, 6. Environment Contract, 8. CI Gates, 9. Foundation Exit Criteria]
+        phases: [P1]
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 8. Compatibility Boundaries, 9. Settings and Bootstrap]
+        phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+    roadmap_phases: [P0, P1, P2, P3, P4, P5, P6, P7]
+
+  core_migrations:
+    match:
+      - server/core/migrations/**
+    required:
+      - path: server/core/.agent-review
+        sections: [Quick Context, Observed Core Data and Side-effect Contracts, Migration and Test Notes]
+        phases: [P0, P1, P2, P4, P6, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [5. Transaction Boundary, 8. Compatibility Boundaries]
+        phases: [P0, P1, P2, P4, P6, P7]
+    roadmap_phases: [P0, P1, P2, P4, P6, P7]
+
+  server_templates:
+    match:
+      - server/templates/**
+    required:
+      - path: server/core/.agent-review
+        sections: [Quick Context, Operations and Security Boundaries]
+        phases: [P2, P6, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [6. Admin Boundary, 8. Compatibility Boundaries]
+        phases: [P2, P6, P7]
+    roadmap_phases: [P2, P6, P7]
+
+  alert_tests:
+    match:
+      - server/tests/test_alert/**
+    required:
+      - path: server/alert/.agent-review
+        sections: [Quick Context, Observed Contracts, Minimum Tests, Confirmed Do-Not-Lose]
+        phases: [P2, P3, P4, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/30-alert-pilot.md
+        sections: [4. Preserved Behavior, 5. Pure Decision Contract, "10. Minimum Tests [P3/P4]"]
+        phases: [P3]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: ["6. Application Transaction [P4]", "10. Minimum Tests [P3/P4]", "11. Cutover Gate [P4]"]
+        phases: [P4]
+    roadmap_phases: [P2, P3, P4, P7]
+
+  core_transport_tests:
+    match:
+      - server/tests/test_core/test_events.py
+      - server/tests/test_core/test_packets.py
+    required:
+      - path: server/core/transport/.agent-review
+        sections: [Quick Context, Observed Packet DTOs, Observed Event DTOs, Minimum Characterization Tests]
+        phases: [P1, P4, P6, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 8. Compatibility Boundaries]
+        phases: [P1, P6, P7]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["Command envelope [P4]", P4 foundation, "6. Consumer Settlement [P4]", P4 tests]
+        phases: [P4]
+    roadmap_phases: [P1, P4, P6, P7]
+
+  worker_tests:
+    match:
+      - server/tests/test_workers/**
+    required:
+      - path: server/core/worker_queue_handlers/.agent-review
+        sections: [Quick Context, Observed Worker Contracts, Minimum Characterization Tests, Confirmed Do-Not-Lose Behavioral Boundaries]
+        phases: [P1, P4, P6, P7]
+    conditional: {}
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 3. Code Boundaries]
+        phases: [P1, P6, P7]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]", P4 tests]
+        phases: [P4]
+    roadmap_phases: [P1, P4, P6, P7]
+
+  infrastructure_future:
+    match:
+      - server/infrastructure/**
+    required:
+      - path: server/core/.agent-review
+        sections: [Quick Context, Runtime Processes, Remaining Core Ownership]
+        phases: [P4, P5, P6, P7]
+    conditional:
+      transport_boundary_change:
+        apply_when: infrastructure work changes RabbitMQ, MQTT, outbox, delivery, routing, or settlement boundaries
+        match:
+          - server/infrastructure/rabbitmq/**
+          - server/infrastructure/mqtt/**
+          - server/infrastructure/outbox/**
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts, Failure and Reliability Matrix]
+            phases: [P4, P5, P6, P7]
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [1. Shape, 2. Runtime Processes, 3. Code Boundaries, 5. Transaction Boundary, 9. Settings and Bootstrap]
+        phases: [P4, P5, P6, P7]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]"]
+        phases: [P4]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: [P5 history ownership, P5 additions, "7. Ordering [P5]"]
+        phases: [P5]
+    roadmap_phases: [P4, P5, P6, P7]
+
+  scheduler:
+    match:
+      - server/core/scheduler/**
+      - server/core/management/commands/start_scheduler.py
+    required:
+      - path: server/core/scheduler/.agent-review
+        sections: [Quick Context, Observed Redis Scheduling Contract, Observed Task Contracts]
+        phases: [P1, P3, P4, P6, P7]
+    conditional:
+      failure_or_concurrency_change:
+        apply_when: scheduler ownership, restart behavior, concurrency, error handling, or Redis durability changes
+        match: []
+        refs:
+          - path: server/core/scheduler/.agent-review
+            sections: [Failure and Concurrency Risks, Unverified / Decision Required]
+            phases: [P1, P3, P4, P6, P7]
+      alert_policy_change:
+        apply_when: scheduled work changes alert timing, mode, counter, state, or reset semantics
+        match: []
+        refs:
+          - path: server/alert/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P3, P4]
+      publish_contract_change:
+        apply_when: scheduler publication exchange, routing key, envelope, confirmation, or failure semantics change
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts]
+            phases: [P4, P6, P7]
+    target_plans:
+      - path: .agents/plans/15-foundation-and-tooling.md
+        sections: [2. Supported Environment, 5. Canonical Commands, 6. Environment Contract, 9. Foundation Exit Criteria]
+        phases: [P1]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: [4. Preserved Behavior, 5. Pure Decision Contract, "10. Minimum Tests [P3/P4]"]
+        phases: [P3]
+      - path: .agents/plans/30-alert-pilot.md
+        sections: ["8. Entry Adapters [P4]", "9. Domain Events [P4]", "11. Cutover Gate [P4]"]
+        phases: [P4]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P1, P3, P4, P6, P7]
+
+  transport:
+    match:
+      - server/core/transport/**
+    required:
+      - path: server/core/transport/.agent-review
+        sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts, Confirmed Do-Not-Lose Contracts]
+        phases: [P1, P4, P6, P7]
+    conditional:
+      packet_contract_change:
+        apply_when: MQTT packet fields, validation, topic registry, serialization, or device wire compatibility changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Observed Packet DTOs, Topic Registry, Minimum Characterization Tests]
+            phases: [P1, P4, P6, P7]
+      event_envelope_change:
+        apply_when: internal command/event fields, headers, encoding, schema version, or reliability semantics change
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Observed Event DTOs, Failure and Reliability Matrix, Minimum Characterization Tests]
+            phases: [P4, P6, P7]
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 3. Code Boundaries, 8. Compatibility Boundaries, 9. Settings and Bootstrap]
+        phases: [P1]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["Command envelope [P4]", "4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]", P4 gate]
+        phases: [P4]
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 8. Compatibility Boundaries]
+        phases: [P6, P7]
+    roadmap_phases: [P1, P4, P6, P7]
+
+  workers:
+    match:
+      - server/core/worker_queue_handlers/**
+      - server/core/management/commands/start_worker.py
+    required:
+      - path: server/core/worker_queue_handlers/.agent-review
+        sections: [Quick Context, Observed Worker Contracts, Confirmed Do-Not-Lose Behavioral Boundaries]
+        phases: [P1, P4, P6, P7]
+    conditional:
+      settlement_or_failure_change:
+        apply_when: ACK, retry, reject, DLQ, callback failure, transaction, or partial-effect behavior changes
+        match: []
+        refs:
+          - path: server/core/worker_queue_handlers/.agent-review
+            sections: [Current Failure Outcomes, Side-Effect Ownership Matrix, Minimum Characterization Tests]
+            phases: [P1, P4, P6, P7]
+      wire_or_topology_change:
+        apply_when: worker queue, binding, exchange, routing, envelope, publisher, or broker-failure behavior changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts, Failure and Reliability Matrix]
+            phases: [P4, P6, P7]
+      alert_handler_change:
+        apply_when: worker routing or effects change alert state, counter, reset, history, or refresh behavior
+        match: []
+        refs:
+          - path: server/alert/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P4]
+          - path: server/event_contexts/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P4]
+    target_plans:
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 3. Code Boundaries, 9. Settings and Bootstrap]
+        phases: [P1]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]", P4 tests, P4 gate]
+        phases: [P4]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P1, P4, P6, P7]
+
+  history:
+    match:
+      - server/streams/**
+    required:
+      - path: server/streams/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P4, P5, P7]
+    conditional:
+      current_flow_or_migration_change:
+        apply_when: legacy stream writes, reads, migration, retention, data classification, or failure behavior changes
+        match: []
+        refs:
+          - path: server/streams/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests, Unverified / Decision Required]
+            phases: [P2, P5, P7]
+      event_production_change:
+        apply_when: history-producing domain contexts, event categories, source facts, or audit/game classification changes
+        match: []
+        refs:
+          - path: server/event_contexts/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P4, P5]
+      broker_delivery_change:
+        apply_when: history or projection publication, routing, confirmation, retry, or broker ownership changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Publisher Contract, Observed Routing Contracts]
+            phases: [P4, P5]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: [P4 foundation ownership, "4. Transactional Outbox [P4]", P4 foundation, "6. Consumer Settlement [P4]"]
+        phases: [P4]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["1. Objective [P4/P5]", P5 history ownership, "Game event envelope [P5]", P5 additions, "7. Ordering [P5]", "8. Player Feed Projection [P5]", "9. Operator Monitoring Projection [P5]", "10. Legacy Stream Migration [P5]", P5 tests, P5 gate]
+        phases: [P5]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P4, P5, P7]
+
+  assets:
+    match:
+      - server/assets/**
+    required:
+      - path: server/assets/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P6, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: asset upload, validation, metadata, blob lifecycle, URL, deletion, or failure behavior changes
+        match: []
+        refs:
+          - path: server/assets/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests, Unverified / Decision Required]
+            phases: [P2, P6, P7]
+      terminal_payload_change:
+        apply_when: asset changes alter terminal menu, account, content, label, timer, or input payloads
+        match: []
+        refs:
+          - path: server/peripheral_behavior/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P6]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P6, P7]
+
+  devices:
+    match:
+      - server/peripheral_devices/**
+    required:
+      - path: server/peripheral_devices/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P4, P6, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: device identity, persistence, desired/reported state, delivery, liveness, or failure behavior changes
+        match: []
+        refs:
+          - path: server/peripheral_devices/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests, Unverified / Decision Required]
+            phases: [P2, P4, P6, P7]
+      access_or_terminal_projection_change:
+        apply_when: device changes alter lock access, terminal account, menu, permission, or projection payloads
+        match: []
+        refs:
+          - path: server/peripheral_behavior/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P6]
+      asset_projection_change:
+        apply_when: device payload or API changes alter asset identity, URL, metadata, or content delivery
+        match: []
+        refs:
+          - path: server/assets/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P6]
+      wire_contract_change:
+        apply_when: MQTT topics, packet fields, serialization, routing, or device wire compatibility changes
+        match: []
+        refs:
+          - path: server/core/transport/.agent-review
+            sections: [Quick Context, Observed Packet DTOs, Observed Routing Contracts, Confirmed Do-Not-Lose Contracts]
+            phases: [P4, P6, P7]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/40-game-events-and-rabbitmq.md
+        sections: ["Command envelope [P4]", P4 foundation, "6. Consumer Settlement [P4]"]
+        phases: [P4]
+      - path: .agents/plans/10-target-architecture.md
+        sections: [2. Runtime Processes, 3. Code Boundaries, 8. Compatibility Boundaries]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P4, P6, P7]
+
+  behavior:
+    match:
+      - server/peripheral_behavior/**
+    required:
+      - path: server/peripheral_behavior/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P6, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: access, menu, account, ordering, projection, persistence, or failure behavior changes
+        match: []
+        refs:
+          - path: server/peripheral_behavior/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests, Unverified / Decision Required]
+            phases: [P2, P6, P7]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P6, P7]
+
+  imports:
+    match:
+      - server/admin_extended/**
+    required:
+      - path: server/admin_extended/.agent-review
+        sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+        phases: [P2, P6, P7]
+    conditional:
+      current_flow_or_failure_change:
+        apply_when: import UI, parsing, validation, authorization, reporting, route, or failure behavior changes
+        match: []
+        refs:
+          - path: server/admin_extended/.agent-review
+            sections: [Canonical Flows, Failure Model, Minimum Tests, Unverified / Decision Required]
+            phases: [P2, P6, P7]
+      user_or_access_persistence_change:
+        apply_when: import changes user, access-code, permission, account, duplicate, or persistence behavior
+        match: []
+        refs:
+          - path: server/peripheral_behavior/.agent-review
+            sections: [Quick Context, Observed Contracts, Confirmed Do-Not-Lose]
+            phases: [P6]
+    target_plans:
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 5. P2 — Admin-First HTTP Surface]
+        phases: [P2]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 9. P6 — Remaining Vertical Slices]
+        phases: [P6]
+      - path: .agents/plans/20-migration-roadmap.md
+        sections: [2.1 Work Package Register, 10. P7 — Cleanup]
+        phases: [P7]
+    roadmap_phases: [P2, P6, P7]

@@ -1,17 +1,35 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:61c60119c6effeace9820957b3cb84993fa2a62e6a914bfe216863bd611bcc2f
+scope:
+  - server/event_contexts/**
+parent: server/.agent-review
+read_when:
+  - changing event dispatch, alert contexts, lock interaction, power rules, or generated effects
+target_authority:
+  - .agents/plans/30-alert-pilot.md
+  - .agents/plans/40-game-events-and-rabbitmq.md
+roadmap_phases: [P3, P4, P5, P6, P7]
+---
 # AGENT REFERENCE: EVENT CONTEXTS
 
-Reviewed: 2026-08-24
-Scope: `server/event_contexts` and direct dependencies
-Purpose: behavior map for preserving event-driven game rules during repair or migration
+## Quick Context
+
+- Responsibility: record current event dispatch, alert/device decisions, logs, and follow-up effects.
+- Confirmed contracts: alert/device event shapes, white-state bootstrap limits, power progression, and source/reset behavior require characterization.
+- Top defects: body/header conflicts, weak validation, interleaved effects, unconditional ACK, and dormant contexts.
+- Target disposition: policies move to owning domain slices; legacy event contexts are removed after per-slice cutover.
+- Read next: use alert/history/worker routes selected by `.agents/context-routing.yml`.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/alert/.agent-review` before changing this area.
-3. Treat code and worker settlement behavior as authoritative; use tests, fixtures, and docs as supporting evidence.
-4. Preserve confirmed wire and game-rule contracts, not swallowed failures, false success logs, recursive model events, or unconditional ACK behavior.
-5. Keep event decoding, routing, domain decisions, persistence, publishing, device commands, logging, and message settlement separate.
-6. Make ordering, concurrency, idempotency, retries, dead-letter policy, and partial effects explicit.
+1. Treat code and worker settlement behavior as authoritative; use tests, fixtures, and docs as supporting evidence.
+2. Preserve confirmed wire and game-rule contracts, not swallowed failures, false success logs, recursive model events, or unconditional ACK behavior.
+3. Keep event decoding, routing, domain decisions, persistence, publishing, device commands, logging, and message settlement separate.
+4. Make ordering, concurrency, idempotency, retries, dead-letter policy, and partial effects explicit.
 
 ## 1. Sources
 
@@ -180,7 +198,7 @@ ClientUpdateContext.apply(AlertStateEvent)
 
 No import, dispatcher entry, or caller activates `ClientUpdateContext`. Current state changes refresh device configurations but do not execute this database mutation table. If activated, manager methods iterate and save devices one by one, with per-row publish side effects and no transaction.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### Base event/context contract
 
@@ -291,31 +309,25 @@ No import, dispatcher entry, or caller activates `ClientUpdateContext`. Current 
 - Dead/uncertain code: `ClientUpdateContext`, `create_alert_reaction_event()`, and `DeviceNotFoundEvent` have no source callers. Intended activation/removal and compatibility requirements are unknown.
 - Fixture drift: `skaben_data.json` is currently modified and includes runtime data; use power-state examples as supporting evidence, not immutable truth.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
 
-| Target component | Responsibility | Constraints |
+Non-authoritative candidate mapping. Alert and Rabbit plans own target behavior; domain policies move to owning slices.
+
+| Current concern | Owning target area | Disposition |
 | --- | --- | --- |
-| `EventEnvelope` | Versioned type/source/ID/time/correlation/causation schema | Preserve current header/body adapter during migration |
-| `EventDecoderRegistry` | Decode and validate one concrete event before dispatch | Registry-driven device types; typed unsupported/malformed outcomes |
-| `EventRouter` | Route one event to one or more explicit handlers | Deterministic handler order; no side effects in routing |
-| `AlertCommandHandler` | Execute validated state/counter commands | Serialized global aggregate; explicit source/reset policy |
-| `LockInteractionHandler` | Validate interaction, determine access/bootstrap outcome | Strict payload; server-owned authorization; idempotent creation |
-| `PowerShieldPolicy` | Pure command/current-state to optional alert command | Configured state map; explicit valid no-op/error result |
-| `EventUnitOfWork` | Commit domain mutations, audit records, and outbox entries | ACK only after durable commit; compensate/rollback partial effects |
-| `OutboxPublisher` | Deliver follow-up/domain/device events and track attempts | Confirmed publish, bounded retry, DLQ, deduplication |
-| `AuditSink` | Persist structured outcome without controlling required effects accidentally | Redact sensitive values; severity/reason codes; explicit optionality |
-| `ScheduledAlertPolicy` | Pure automatic/reaction event calculation | Handle terminal neighbors/config errors; no process-level failure |
+| envelope decoding and routing | shared event/transport infrastructure | retain compatibility adapters; remove side effects from routing |
+| alert and scheduled decisions | alert slice | migrate in P3/P4 through `30-alert-pilot.md` |
+| lock and power decisions | behavior/device slices | migrate in P6 under owning services |
+| logs and follow-up publication | audit/outbox/operational-log boundaries | classify in P4/P5; remove legacy context orchestration in P7 |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
 
-1. Characterize exact event envelopes, dispatcher order, lock/power decisions, alert recursion, logs, follow-up events, and settlement failures.
-2. Add event IDs/correlation and make domain commit, audit commit, outbox enqueue, publish, and ACK outcomes observable.
-3. Define malformed, unsupported, retryable, discard, idempotency, and dead-letter policies.
-4. Correct DTO validation at ingress and adapt existing MQTT/internal wire formats into typed commands.
-5. Extract pure alert, lock, power, and scheduled policies from ORM/publisher contexts.
-6. Introduce aggregate serialization plus transaction/outbox handlers; move ACK ownership to settlement policy.
-7. Decide and explicitly wire or remove dormant client-update/reaction/device-not-found behavior.
-8. Remove model-save event recursion, source-string control flow, and legacy unconditional ACK after compatibility verification.
+`20-migration-roadmap.md` owns order. Map alert extraction to P3, event reliability to P4, remaining device rules to P6, and context removal to P7.
+
+- P3: characterize/extract alert decisions without changing runtime ownership.
+- P4: adapt legacy envelopes into reliable command/event handling and cut over alert paths.
+- P6: move lock/power behavior to owning device/behavior services and decide dormant paths.
+- P7: remove source-string recursion and legacy context orchestration after parity.
 
 ## 9. Minimum Tests
 
@@ -331,7 +343,13 @@ No import, dispatcher entry, or caller activates `ClientUpdateContext`. Current 
 - Dormant `ClientUpdateContext` mapping if retained, including partial device-save/publish failure.
 - Wire compatibility with MQTT INFO `datahold`, fixture power commands, StreamRecord fields, and client-update routing.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Decide whether dormant `ClientUpdateContext`, `create_alert_reaction_event()`, and `DeviceNotFoundEvent` are activated or removed.
+- Decide which audit records are required transactional facts versus optional operational logs.
+- Define device-refresh target timing and follow-up ordering before P4 cutover.
+
+## 11. Confirmed Do-Not-Lose
 
 - Internal event names and header/body split: `alert_state`, `alert_counter`, `device`, and `log`.
 - Alert operations `increase`, `decrease`, and `set`; state name plus `counter_reset` compatibility.
@@ -340,8 +358,5 @@ No import, dispatcher entry, or caller activates `ClientUpdateContext`. Current 
 - Power-shield progression represented by current fixture: `blue --AUX--> cyan --PWR--> first ingame`; `OFF` does not transition.
 - White-state bootstrap restriction for unknown locks/cards and exact access-code string preservation.
 - Existing alert source/reset distinction until replaced by explicit command types and verified adapters.
-- Required audit visibility for access results, expected rejections, alert switches, and counter resets—with sensitive-value policy clarified.
-- Device refresh routing after state/counter change and durable follow-up event order.
+- Audit-relevant source facts needed to reconstruct access results, expected rejections, alert switches, and counter resets.
 - Stream log compatibility: stream `log`, context source, severity mark, message, and optional message data.
-
-<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->

@@ -1,17 +1,34 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:ce9abed3be10f18c047faf97328e1cc3fc903332985019e338d45bc7781bc515
+scope:
+  - server/peripheral_behavior/**
+parent: server/.agent-review
+read_when:
+  - changing access codes, lock permissions, menus, terminal accounts, or assignments
+target_authority:
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P2, P6, P7]
+---
 # AGENT REFERENCE: PERIPHERAL BEHAVIOR
 
-Reviewed: 2026-08-24
-Scope: `server/peripheral_behavior` and direct dependencies
-Purpose: behavior map for preserving access-control and terminal-menu contracts during repair or migration
+## Quick Context
+
+- Responsibility: preserve player identity/access and terminal menu/account projections.
+- Confirmed contracts: user/code uniqueness, lock ACL shape, polymorphic resource types, and terminal state-map fields require compatibility coverage.
+- Top defects: public secret exposure, broken nested writes/hashes, unstable ordering, cascade surprises, and incomplete refresh propagation.
+- Target disposition: domain services own behavior; generic writable REST remains only for verified compatibility.
+- Read next: other area reviews load only when their matched paths/contracts also change.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Read `server/assets/.agent-review`, `server/alert/.agent-review`, `server/event_contexts/.agent-review`, and the relevant `server/core` reviews before changing this area.
-3. Treat code and database constraints as authoritative; use migrations, serializers, admin forms, fixtures, tests, and docs as supporting evidence.
-4. Preserve confirmed lock ACL, terminal projection, polymorphic discriminator, and content-shape contracts, not broken nested writes, unstable hashes, public mutation, or accidental cascades.
-5. Keep transport/API adapters, access policy, menu composition, persistence, secrets, device projection, and refresh side effects separate.
-6. Make ordering, uniqueness, concurrency, cache invalidation, retries, destructive cascades, and authorization explicit.
+1. Treat code and database constraints as authoritative; use migrations, serializers, admin forms, fixtures, tests, and docs as supporting evidence.
+2. Preserve confirmed lock ACL, terminal projection, polymorphic discriminator, and content-shape contracts, not broken nested writes, unstable hashes, public mutation, or accidental cascades.
+3. Keep transport/API adapters, access policy, menu composition, persistence, secrets, device projection, and refresh side effects separate.
+4. Make ordering, uniqueness, concurrency, cache invalidation, retries, destructive cascades, and authorization explicit.
 
 ## 1. Sources
 
@@ -166,7 +183,7 @@ delete Lock/Terminal
 
 Deleting an alert state removes corresponding M2M join rows and can leave a permission or terminal assignment with no active states. Public API deletion of menu items and accounts makes relevant cascades remotely reachable under current REST defaults.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### Game identity and access codes
 
@@ -291,7 +308,9 @@ Deleting an alert state removes corresponding M2M join rows and can leave a perm
 - Defects: standalone domain edits do not consistently schedule affected-device refresh, and update delivery success is not observable.
 - Evidence: `skaben_data.json` contains users, one six-character access code, and one permission, but no menu/account/terminal-assignment examples; it is supporting evidence only and was already modified at review time.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. `20-migration-roadmap.md` owns target phase order; generic writable REST is transitional.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -307,7 +326,9 @@ Deleting an alert state removes corresponding M2M join rows and can leave a perm
 | `BehaviorApi` | Authorized commands and stable read projections | no implicit nested writes, typed conflicts, safe destructive operations |
 | `BehaviorAdminAdapter` | Human editing over the same services | impact preview, audit actor, no admin-only side-effect semantics |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. Map security decisions to P2, behavior/projection work to P6, and cleanup to P7.
 
 1. Characterize existing lock ACL, menu/account, terminal state-map, hash, API discriminator, deletion, and failure behavior.
 2. Lock down behavior endpoints and split secret/operator/device/read representations before expanding write support.
@@ -335,16 +356,18 @@ Deleting an alert state removes corresponding M2M join rows and can leave a perm
 - Asset, user, code, state, menu, account, lock, and terminal deletion obey reviewed protection/cascade policy and refresh dependents.
 - Existing terminal and lock clients accept the preserved wire fields, discriminator values, IDs, and state-list semantics.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Confirm six-character bootstrap compatibility and the final empty-state permission policy.
+- Decide menu/account presentation ordering and complete revision inputs before terminal cutover.
+- Confirm required game-password behavior and any remaining API consumer.
+- Confirm exact affected-device refresh fanout for access, assignment, account, menu, and asset changes.
+
+## 11. Confirmed Do-Not-Lose
 
 - Global user-name and access-code uniqueness, persisted primary keys, and compatibility with existing code strings.
 - One effective card/lock grant and lock ACL wire map `{access_code: [alert_state_database_ids]}`.
-- Six-character unknown-code bootstrap behavior where compatibility requires it, without silently granting permissions.
 - Polymorphic menu subtype identity and current `resourcetype` values until terminal-client migration is verified.
 - Menu/account UUID compatibility and typed links to audio, video, image, text, and user-input assets.
-- Player-facing timer, label, input label/description, terminal header/footer, and reviewed game-password behavior.
+- Player-facing timer, label, input label/description, terminal header, and terminal footer fields.
 - Terminal account availability by alert-state IDs and the `accounts` plus `account_state_map` client projection.
-- Explicitly chosen menu/account presentation order and a revision that changes for every runtime-relevant modification.
-- Required affected-device refresh after committed access, assignment, account, menu, or asset changes.
-
-<!-- Observed behavior is recorded as current outcome/contracts. Required and target behavior is intentionally separate. -->

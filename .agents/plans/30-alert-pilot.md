@@ -1,24 +1,30 @@
 # Alert Migration Pilot
 
-Reviewed: 2026-08-24
-Status: proposed first vertical slice
-Depends on: `server/alert/.agent-review`, `server/event_contexts/.agent-review`, `server/core/scheduler/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, `10-target-architecture.md`
+Reviewed: 2026-08-25
+Status: proposed
+Role: first vertical slice
+Depends on: `20-migration-roadmap.md`, `10-target-architecture.md`, and the alert route in `../context-routing.yml`
 
 ## 1. Objective
 
-Use alert state/counter behavior as first complete application-service slice. Borrow tested extraction ideas from `skb_refactored/app`, but correct its transaction, queue, settlement, and admin gaps before runtime cutover.
+Use alert state/counter behavior as first complete application-service slice. Borrow tested extraction ideas from `refactor_reference/app`, resolved through the source registry in `README.md`, but correct its transaction, queue, settlement, and admin gaps before runtime cutover.
+
+Phase ownership:
+
+- P3 owns DTO/policy/repository extraction, characterization, and non-mutating shadow comparison.
+- P4 owns schema constraints, transaction/audit/outbox integration, adapters, settlement, and runtime cutover.
 
 ## 2. Source Material to Adapt
 
 Useful prototype files:
 
-- `app/dto/alert.py`
-- `app/services/alert_state_machine.py`
-- `app/services/alert_auto_change.py`
-- `app/repositories/alert.py`
-- `app/adapters/internal_alert.py`
-- `app/adapters/scheduler_alert.py`
-- `app/tests/tests_alert/`
+- `/home/zerthmonk/skaben_refactor_reference/app/dto/alert.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/services/alert_state_machine.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/services/alert_auto_change.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/repositories/alert.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/adapters/internal_alert.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/adapters/scheduler_alert.py`
+- `/home/zerthmonk/skaben_refactor_reference/app/tests/tests_alert/`
 
 Do not copy prototype MQ publisher, broad alert worker, minimal settings, stream repository, or Compose cutover as-is.
 
@@ -32,7 +38,7 @@ Do not copy prototype MQ publisher, broad alert worker, minimal settings, stream
 | `AlertPolicy` | pure threshold/state/auto-change decision |
 | `AlertTransition` | new counter/state plus domain events and refresh requirements |
 | `AlertRepository` | locked/versioned snapshot load and persistence |
-| `AlertService` | transaction, policy call, state/history/outbox append |
+| `AlertService` | transaction, policy call, state/audit/domain-record/outbox persistence |
 | `AlertAdminAdapter` | validated staff actions calling `AlertService` |
 | `AlertCommandHandler` | Rabbit command decoding, service invocation, settlement |
 | `AlertSchedulerAdapter` | enqueue due auto-change command, never mutate state directly |
@@ -77,7 +83,7 @@ AlertTransition
 
 Policy must not import Django ORM, settings, RabbitMQ, MQTT, Redis, admin, or request objects. Time-dependent scheduler decisions receive time/config explicitly.
 
-## 6. Application Transaction
+## 6. Application Transaction [P4]
 
 Target execution:
 
@@ -89,7 +95,7 @@ begin transaction
 -> run AlertPolicy
 -> persist counter snapshot when changed
 -> update exactly one current state when changed
--> append alert GameEvent/AuditEvent rows
+-> append required alert AuditEvent rows
 -> append device-refresh OutboxMessage rows
 -> record command result/idempotency
 -> commit
@@ -97,18 +103,15 @@ begin transaction
 
 No direct publisher call occurs inside policy, repository, model `save()`, or transaction callback. Outbox worker handles delivery after commit.
 
-## 7. Concurrency Policy
+## 7. Concurrency Policy [P4]
 
-Alert changes must serialize. Choose one tested implementation:
+Alert changes serialize on one singleton alert aggregate row locked with `select_for_update()`. The aggregate owns a non-null current-state reference; P4 keeps legacy `AlertState.current` flags synchronized for database and fixture compatibility.
 
-- lock a singleton alert aggregate row with `select_for_update()`; or
-- use an explicit aggregate version and retry conflicts.
+Do not rely on reading latest `AlertCounter` and writing a new row without the aggregate lock. Two concurrent increments must preserve both operations in committed order.
 
-Do not rely on reading latest `AlertCounter` and writing a new row without a lock. Two concurrent increments must produce both increments in deterministic order.
+The aggregate reference plus transaction logic must enforce exactly one current alert state. P4 data migration must fail visibly rather than guess when legacy data has zero or multiple current rows.
 
-Database constraints or transaction logic must enforce at most one current alert state.
-
-## 8. Entry Adapters
+## 8. Entry Adapters [P4]
 
 ### Admin
 
@@ -141,7 +144,7 @@ Database constraints or transaction logic must enforce at most one current alert
 - Keep original device ID, event source, timestamp, task ID, and correlation metadata.
 - Do not invoke worker callback in-process as alternate semantics.
 
-## 9. Domain Events
+## 9. Domain Events [P4]
 
 Minimum committed event types:
 
@@ -150,21 +153,23 @@ Minimum committed event types:
 - `operator.alert_state_requested`
 - `scheduler.alert_change_requested` where audit requires request visibility
 
+P4 records alert control-plane history as `AuditEvent` and publishes compatible domain-event work through the outbox. P5 may additionally append player/game-relevant alert facts as session-scoped `GameEvent` rows. Absence of a session must not fabricate a `GameEvent.session_id`.
+
 Refresh work should be explicit outbox commands, for example:
 
 - `device.refresh_requested` with target `scl/all`;
 - `device.refresh_requested` with active topic snapshot or a deterministic resolver policy.
 
-Decide whether active-topic membership is captured at transaction time or resolved at delivery time. Test chosen semantics.
+Whether active-topic membership is captured at transaction time or resolved at delivery time remains `Unverified / Decision Required`. P4 cutover is blocked until the owning work package records and tests one choice.
 
-## 10. Minimum Tests
+## 10. Minimum Tests [P3/P4]
 
 - Set/increase/decrease success and no-op.
 - Exact threshold lower/upper boundaries.
-- Negative/out-of-range counter behavior.
-- State request found/not found.
+- Characterize current negative and above-maximum counter outcomes in P3; replace this characterization with named accepted outcomes before P4 cutover.
+- State request found succeeds; unknown state is rejected without state/history/outbox changes.
 - Counter reset enabled/disabled and unchanged threshold.
-- Auto-increase/decrease, dampening, disabled fields, invalid mode.
+- Auto-increase/decrease and dampening follow characterized boundaries; disabled configuration is a visible no-op; invalid mode is rejected without stopping the scheduler process.
 - Two concurrent increments preserve both operations.
 - Duplicate command ID changes state once.
 - Transaction rollback leaves no state/history/outbox partials.
@@ -176,7 +181,9 @@ Decide whether active-topic membership is captured at transaction time or resolv
 - Worker settlement: success ACK, transient retry, invalid DLQ.
 - Legacy/new policy comparison against recorded sequences.
 
-## 11. Cutover Gate
+P3 shadow tests must prove no state write, history append, outbox append, broker publication, device refresh, or message-settlement effect occurs. Legacy execution remains the sole side-effect owner.
+
+## 11. Cutover Gate [P4]
 
 Alert runtime may cut over only when:
 
@@ -184,9 +191,9 @@ Alert runtime may cut over only when:
 - model saves no longer publish alert events for migrated writes;
 - queue binding cannot receive unrelated traffic;
 - state/history/outbox transaction and concurrency tests pass;
+- exactly one aggregate-selected current state exists and legacy flags match it;
 - publisher confirmation/retry/DLQ are operational;
 - device refresh fanout matches captured legacy expectations;
 - scheduler behavior and restart semantics are covered;
 - operator admin provides required alert control;
 - rollback can re-enable legacy process without replaying already committed commands incorrectly.
-

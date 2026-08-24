@@ -1,17 +1,35 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:a81aafa175d65693722e4ef98eaa746a8bf380a695f62679aae60e29a8452196
+scope:
+  - server/alert/**
+  - server/event_contexts/alert/**
+parent: server/.agent-review
+read_when:
+  - changing alert state, counter, policy, admin, HTTP compatibility, or alert events
+target_authority:
+  - .agents/plans/30-alert-pilot.md
+roadmap_phases: [P2, P3, P4, P6, P7]
+---
 # AGENT REFERENCE: ALERT
 
-Reviewed: 2026-08-24
-Scope: `server/alert` and direct dependencies
-Purpose: behavior map for preserving alert-state and alert-counter contracts during migration
+## Quick Context
+
+- Responsibility: preserve current alert state/counter rules and entrypoint behavior during extraction.
+- Confirmed contracts: state names/IDs/order, counter history, threshold mapping, reset distinction, and device refresh shapes require compatibility tests.
+- Top defects: no exact-one DB constraint, concurrent lost updates, model-save publication, undefined-variable failure, and ACK-on-error.
+- Target disposition: migrate through the alert slice plan; generic REST survives only as verified temporary compatibility.
+- Read next: alert-event and scheduler paths select their own routes; load transport detail only for wire changes.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Treat `server/alert`, `server/event_contexts/alert`, and their runtime callers as authoritative; use tests, generated schema, fixtures, and docs as supporting evidence.
-3. Preserve confirmed alert contracts, not accidental failure behavior such as swallowed publishes, unconditional acknowledgements, or ineffective purge operations.
-4. Keep HTTP transport, event transport, transition policy, persistence, scheduling, and device-update side effects separate.
-5. Make alert transition serialization, counter ordering, publish success, retries, settlement, and idempotency explicit.
-6. Read `server/core/.agent-review`, `server/core/transport/.agent-review`, `server/core/worker_queue_handlers/.agent-review`, and `server/core/scheduler/.agent-review` before changing their shared boundaries.
+1. Treat `server/alert`, `server/event_contexts/alert`, and their runtime callers as authoritative; use tests, generated schema, fixtures, and docs as supporting evidence.
+2. Preserve confirmed alert contracts, not accidental failure behavior such as swallowed publishes, unconditional acknowledgements, or ineffective purge operations.
+3. Keep HTTP transport, event transport, transition policy, persistence, scheduling, and device-update side effects separate.
+4. Make alert transition serialization, counter ordering, publish success, retries, settlement, and idempotency explicit.
 
 ## 1. Sources
 
@@ -132,7 +150,7 @@ client update request
 
 Scale `borders` are evenly split between service values `min_alert_value=1` and the maximum ingame threshold; they are not the configured state thresholds themselves.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### `AlertState`
 
@@ -226,7 +244,9 @@ Scale `borders` are evenly split between service values `min_alert_value=1` and 
 - Defects: undefined `old_state`, possible `set_state_current(None)`, omitted counter values becoming `None`, ineffective purge route, broken unused counter manager fallback, incorrect health-check exception handling, ineffective auth mixin, invalid `auto_change` default, silent unknown-state no-op, and unchecked scheduler neighbors.
 - Evidence drift: `skaben_data.json` contains runtime counter history as well as configuration and is currently modified in the worktree; treat its values as supporting examples, not immutable contracts. Current standard fixture has non-ingame `white`, `blue`, `cyan`, `black`; ingame `green` threshold 1, `yellow` 500, `red` 1000; `green` is current.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. `30-alert-pilot.md` owns alert target behavior and phase scope.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -239,7 +259,9 @@ Scale `borders` are evenly split between service values `min_alert_value=1` and 
 | `AlertSchedulerPolicy` | Calculate next command and interval | Pure calculation; handle terminal neighbors and bad config without process death |
 | `AlertAPI` | Authenticate/authorize reads and commands; report sync/async outcome | Preserve route compatibility until clients migrate; no hidden model-save effects |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. Map extraction to P3, reliability/cutover to P4, and legacy removal to P7.
 
 1. Characterize direct state changes, external state events, direct/external counter changes, scheduled changes, and every failure/settlement path.
 2. Make database success, event enqueue success, and device-update success independently observable.
@@ -263,15 +285,17 @@ Scale `borders` are evenly split between service values `min_alert_value=1` and 
 - HTTP: permissions, list/retrieve/create, `set_current` statuses/body, latest initialization, and removal or corrected implementation of purge.
 - Wire/schema compatibility: exact event headers/body, API routes/fields, routing keys, state IDs/names, and counter comments/timestamps.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
 
-- HTTP route names and current response fields until callers migrate: `alert_state`, `alert_counter`, `set_current`, and `get_latest`.
+- Decide expected negative, above-maximum, threshold-gap, duplicate-threshold, and order-mismatch outcomes before P4 cutover.
+- Confirm temporary HTTP route consumers, exact route/response compatibility, and route-retirement gate in P0/P2.
+- Decide whether transition operational logs are required effects or best-effort diagnostics.
+- Confirm any consumer dependency on counter timestamp/comment fields and latest-by-insertion ordering.
+
+## 11. Confirmed Do-Not-Lose
+
 - Internal event names and shapes: `alert_state`, `alert_counter`, source header, state/counter payloads, and `increase|decrease|set` operations.
 - Device routing formats: `internal` events and `client_update.<topic>.all`, including scale topic `scl`.
 - Stable alert state names/IDs/order and existing `PassiveConfig`, access-permission, and terminal-menu relationships.
-- Lower-bound-inclusive threshold semantics and explicit current-state behavior, after edge cases are characterized and approved.
-- Counter history value/comment/timestamp compatibility and latest-by-insertion ordering where clients depend on it.
 - Distinction between manual state changes that reset counter and counter-driven/external transitions that suppress recursive reset.
-- Required downstream effects: refresh all device configs after state transition; refresh scale data after counter-only change; retain operational transition logs.
-
-<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->
+- Required device effects: refresh all device configs after state transition and refresh scale data after counter-only change.

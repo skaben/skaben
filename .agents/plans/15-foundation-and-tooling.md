@@ -1,29 +1,32 @@
 # Foundation and Tooling Plan
 
-Reviewed: 2026-08-24
-Status: proposed
+Reviewed: 2026-08-25
+Status: accepted
+Role: foundation baseline
 Depends on: `00-source-assessment.md`, `10-target-architecture.md`
 
 ## 1. Objective
 
-Adopt useful engineering practices from the template and `skb_refactored` before large behavior changes. Foundation work must create trustworthy feedback without silently changing game, database, or wire contracts.
+Adopt useful engineering practices from `template` and `refactor_reference` before large behavior changes. These names resolve through the source registry in `README.md`. Foundation work must create trustworthy feedback without silently changing game, database, or wire contracts.
 
 ## 2. Supported Environment
 
-Choose one supported matrix before dependency upgrades. Initial recommendation:
+Use the current locked repository matrix for P1:
 
-- Python 3.12;
-- current compatible Django version until startup/migration tests pass;
-- `uv` with one committed lockfile;
+- Python 3.12.x;
+- Django 5.0.3;
+- `uv` with committed `uv.lock` as dependency authority;
 - PostgreSQL, Redis, and RabbitMQ in Docker;
 - host-native lint/tests allowed through documented environment values;
 - application processes remain available through Docker Compose.
 
+Changing the Python minor line, Django version, or dependency authority requires a separate accepted upgrade decision; P1 does not perform that upgrade implicitly.
+
 Do not combine Python/Django major upgrades, DRF removal, package relocation, and domain extraction in one change.
 
-## 3. Dependency Cleanup
+## 3. Dependency Cleanup Ownership
 
-After API-consumer verification, remove:
+P1 inventories API imports, runtime consumers, settings, routes, and startup dependencies. It does not remove DRF or API code. After P0 consumer verification, P2 owns removal of:
 
 - `djangorestframework`;
 - `rest_framework.authtoken` application configuration;
@@ -34,6 +37,8 @@ After API-consumer verification, remove:
 - CORS middleware/settings if no browser client remains.
 
 Do not add Django Ninja. Keep `django-polymorphic` only while menu/content models require it. Review authentication-token tables in a later schema migration rather than coupling table deletion to dependency removal.
+
+P1 must leave the characterized legacy HTTP runtime bootable. Its output is a dependency/removal inventory consumed by P2.
 
 ## 4. Tool Suite
 
@@ -109,7 +114,7 @@ Secrets must not appear in fixtures, admin output, logs, or committed environmen
 | Device contract | golden MQTT packets/simulator | routing and payload compatibility |
 | Bootstrap | real settings/commands | imports, migration, WSGI, process startup |
 
-Tests from `skb_refactored/app/tests/tests_alert` are useful seeds. Copy their behavioral assertions, then add failure, transaction, concurrency, and settlement cases missing from the prototype.
+Tests from `/home/zerthmonk/skaben_refactor_reference/app/tests/tests_alert` are useful seeds. Copy their behavioral assertions, then add failure, transaction, concurrency, and settlement cases missing from the prototype.
 
 ## 8. CI Gates
 
@@ -139,6 +144,5 @@ Nightly or explicit integration lane:
 - WSGI, settings, URLConf, admin, and management commands import through one intended package layout.
 - CI uses the same commands and dependency source as local development.
 - Legacy linter debt is baselined without weakening checks for new code.
-- No generated schema/API command remains in startup after API removal.
+- Current schema/API startup commands and imports are inventoried for P2; P1 removes none of them.
 - Infrastructure and application services can be started separately and together.
-

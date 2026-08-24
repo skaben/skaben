@@ -1,7 +1,8 @@
 # SKABEN Migration Plans
 
-Reviewed: 2026-08-24
-Status: proposed migration baseline
+Reviewed: 2026-08-25
+Status: accepted
+Role: migration baseline
 Scope: migration of the current SKABEN repository toward a layered, testable Django control plane
 
 ## Purpose
@@ -9,12 +10,45 @@ Scope: migration of the current SKABEN repository toward a layered, testable Dja
 This directory turns three sources of information into one executable migration plan:
 
 1. The current repository and `server/**/.agent-review` files describe behavior that exists today.
-2. `/home/zerthmonk/projects/template` provides target conventions for packaging, tooling, tests, settings, and layered application code.
-3. `/home/zerthmonk/skaben_refactor_reference` provides a partially implemented alert migration and evidence about useful extraction seams.
+2. `/home/zerthmonk/projects/skaben` provides target conventions for packaging, tooling, tests, settings, and layered application code.
+3. `/home/zerthmonk/projects/skaben_refactor_ref` provides a partially implemented alert migration and evidence about useful extraction seams.
 
 Code and current `.agent-review` files remain authoritative for existing behavior. The template and partially migrated repository are design inputs, not compatibility specifications.
 
-## Read Order
+## Authority
+
+When sources disagree, use this order:
+
+1. Current code, migrations, deployment entrypoints, and confirmed deployed observation define current behavior.
+2. The nearest `server/**/.agent-review` summarizes current behavior; it does not override code.
+3. Fixed decisions in this file define accepted migration direction.
+4. `10-target-architecture.md` owns target boundaries and process topology.
+5. `20-migration-roadmap.md` owns phase order and cutover sequencing.
+6. Slice plans own implementation detail inside their assigned roadmap phases.
+
+Candidate target mappings and roadmap references in child reviews are non-authoritative. Higher-authority planning documents win; unresolved conflicts block implementation until recorded in the owning plan.
+
+Status vocabulary:
+
+- `verified-current`: current-state review content agrees with its scoped `source_digest`;
+- `stale`: scoped code changed after review and requires rechecking before routed use;
+- `proposed`: planning content awaiting acceptance;
+- `accepted`: approved implementation direction;
+- `superseded`: retained only for history.
+
+## Source Registry
+
+| Name | Location | Reviewed revision | Role |
+| --- | --- | --- | --- |
+| `current_skaben` | `/home/zerthmonk/projects/old-skaben` | `c81012250d4b67d668b3537c4bbd14e83d56b954` | authoritative current implementation |
+| `refactor_reference` | `/home/zerthmonk/projects/skaben_refactor_ref` | `b5b1d399ef2319e57917ed9a6b23c41c4fe77007` | prototype extraction evidence |
+| `template` | `/home/zerthmonk/projects/skaben` | `1186a40cb41d5ebd1c8b604a9aa808a0bebdcacc` | engineering-convention input |
+
+Do not use shorthand source names that are absent from this registry.
+
+## Onboarding Read Order
+
+Use this sequence to understand the complete migration baseline, not as the default context bundle for an implementation task:
 
 1. `server/.agent-review`
 2. Nearest relevant child `.agent-review`
@@ -26,7 +60,32 @@ Code and current `.agent-review` files remain authoritative for existing behavio
    - `30-alert-pilot.md`
    - `40-game-events-and-rabbitmq.md`
 
-When implementing a phase, read only its dependencies and the `.agent-review` files for touched areas.
+## Task Read Algorithm
+
+For a scoped implementation task:
+
+1. Name each owning work package and every intended/touched path before work begins.
+2. Run `python .agents/context_loader.py render --work-package <ID> --path <path>`;
+   repeat both flags when a task spans packages or paths.
+3. Classify the task against each matched condition's `apply_when` rule and pass every
+   applicable semantic flag as `--condition <name>`. Path-decidable conditions are added
+   automatically.
+4. Read the rendered authority summary, shared current context, active roadmap sections,
+   required route sections, phase-owned target sections, and selected conditional sections.
+
+The loader derives phases from explicit work-package IDs and keeps no global active state.
+It accepts routed future paths before those files exist, but rejects unknown packages,
+conditions, absolute/outside-repository paths, unmatched paths, and selected stale reviews.
+After plans, reviews, routing, or the bootstrap change, run
+`python .agents/context_loader.py check` locally.
+
+`Depends on` records authority and implementation order; it does not recursively expand task context. Provenance is never a required-read dependency. When multiple exact routes match, combine their selected sections without loading their parent reviews automatically.
+
+Routing references use exact files plus Markdown heading sections and phases. A selector matches either a complete heading or its unique label after an optional numeric prefix such as `4.`; a section ends at the next heading of equal or higher level. Wildcards are allowed only in `match` path selectors, never in review or plan dependencies. Missing or ambiguous paths, headings, phases, or symmetric cross-review dependencies make the routing manifest invalid.
+
+`source_revision` records review provenance. `source_digest` deterministically detects
+changes to the review's tracked runtime scope; tests, reviews, caches, and generated
+artifacts are excluded, while migrations and runtime templates remain included.
 
 ## Fixed Decisions
 
@@ -90,4 +149,3 @@ Migration is complete when:
 - game history, player feed, operator monitoring, and operational logs have separate owners;
 - every device packet and routing contract has compatibility coverage;
 - legacy handlers, contexts, and model-save side effects have no remaining runtime consumers.
-

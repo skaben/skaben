@@ -1,7 +1,8 @@
 # Migration Roadmap
 
-Reviewed: 2026-08-24
-Status: proposed
+Reviewed: 2026-08-25
+Status: accepted
+Role: roadmap baseline
 Depends on: `00-source-assessment.md`, `10-target-architecture.md`, `15-foundation-and-tooling.md`
 
 ## 1. Strategy
@@ -32,6 +33,31 @@ characterize
 | P6 | Remaining vertical slices | P4/P5 as applicable | slice by slice |
 | P7 | Legacy cleanup and package consolidation | all parity gates | yes |
 
+## 2.1 Work Package Register
+
+This file is the sole ordering authority. Each work package names its owner, dependency, deliverable, preserved contract, verification, cutover, and rollback boundary.
+
+| ID | Owner / depends on | Deliverable | Preserve / verify | Cutover / rollback |
+| --- | --- | --- | --- | --- |
+| `P0-W1` | migration lead / current reviews | consumer, backup, compatibility, and workload evidence | deployed DB/wire/media behavior / restore plus replay evidence | no cutover / no runtime change |
+| `P1-W1` | platform / `P0-W1` | deterministic environment, commands, CI feedback, and bootstrap | legacy runtime / clean-checkout smoke | no cutover / restore prior tooling entrypoint |
+| `P2-W1` | web/admin / `P1-W1` | authenticated admin foundation and route-consumer decision | operator capability / role and route tests | secure HTTP surface / restore protected legacy route |
+| `P2-W2` | web/admin / `P2-W1` | controlled REST/DRF removal | proven terminal/media access / WSGI and admin smoke | remove only unconsumed routes / restore compatibility adapter |
+| `P3-W1` | alert / `P1-W1` | DTO, pure policy, repository seam, and characterization | alert decisions / policy comparison | no cutover / legacy remains owner |
+| `P3-W2` | alert / `P3-W1` | non-mutating shadow comparison | legacy state and effects / captured-sequence parity | no cutover / disable shadow capture |
+| `P4-W1` | messaging / `P3-W2` | event/outbox foundation and reliable Rabbit boundary | legacy wire routes during transition / broker failure tests | new reliable queues / restore isolated legacy consumers |
+| `P4-W2` | alert / `P4-W1` | adapter-by-adapter alert cutover | alert/device behavior / rollback, replay, concurrency tests | one entrypoint set at a time / re-enable legacy owner |
+| `P5-W1` | history / `P4-W1` | game sessions, history, and projections | player/operator semantics / rebuild tests | new read models / restore compatibility reader |
+| `P5-W2` | history / `P5-W1` | reconciled legacy stream migration/archive | legacy record identity/content / count and sample reconciliation | switch verified readers / restore archive reader |
+| `P6-W1` | devices / `P4-W1` | lock identity, liveness, and reported state | MAC, CUP/SUP, no-echo behavior / device replay | lock slice only / legacy handlers |
+| `P6-W2` | assets / `P2-W2` | storage compatibility and recovery behavior | UUIDs, blobs, media consumers / DB-media manifest | verified storage path / legacy read fallback |
+| `P6-W3` | behavior / `P6-W1`, `P6-W2` | access, menu, account ordering, and revisions | ACL/menu/account payloads / golden projection tests | behavior slice / legacy projection |
+| `P6-W4` | terminals / `P6-W3` | terminal projection and delivery | terminal payloads/media access / client replay | terminal slice / legacy delivery |
+| `P6-W5` | devices / `P6-W1` | passive configuration | passive payloads / device fixtures | passive slice / legacy builder |
+| `P6-W6` | scheduler / migrated slice services | remaining scheduled commands | cadence and restart behavior / task characterization | task by task / legacy scheduled task |
+| `P6-W7` | operations + behavior / `P6-W3` | safe imports and repair operations | CSV/access relationships / atomicity and permission tests | register safe route/command / disable entrypoint |
+| `P7-W1` | migration lead / all parity gates | remove explicitly deferred compatibility paths and consolidate packages | IDs, migrations, fixtures, wire formats / full regression suite | final cleanup / restore last compatible release |
+
 ## 3. P0 — Baseline and Recovery Safety
 
 Work:
@@ -42,6 +68,7 @@ Work:
 - Capture golden PING/PONG/CUP/SUP/INFO packets per device type.
 - Record Rabbit topology and deployed firmware/client versions.
 - Measure stream/game-history volume and identify player/operator consumers.
+- Record workload discovery for relevant flows: message volume/bursts, payload sizes, device fanout, queue lag, DB latency, and backfill volume where observable. Unknown values remain explicit evidence gaps, not invented targets.
 - Turn current `.agent-review` minimum tests into characterization backlog.
 - Define migration feature flags or process-level rollback points.
 
@@ -75,7 +102,7 @@ Work:
 - Verify no terminal/device/operator client requires legacy REST routes.
 - Make Django admin authoritative operator surface.
 - Add explicit roles and action permissions.
-- Move important stateful admin actions behind application services.
+- Establish secure admin registrations, roles, read-only diagnostics, and action inventory. Stateful actions move behind application services in their owning domain phases; P2 does not invent temporary domain services.
 - Replace mutating health checks with read-only liveness/readiness.
 - Move repair/import/update operations to audited admin actions or management commands.
 - Remove API routers/views/serializers/schema/auth/CORS dependencies in controlled steps.
@@ -84,7 +111,7 @@ Work:
 Exit:
 
 - No observed or declared consumer depends on removed endpoints.
-- Admin covers alert, devices, behavior/access, terminals, assets, game history, and required operations.
+- Admin securely covers the required operator inventory and existing capabilities; service-backed stateful actions are tracked by owning slice work packages.
 - Fresh dependency install and production WSGI boot without DRF/Spectacular.
 - Access secrets are masked and destructive cascades are constrained/visible.
 
@@ -95,7 +122,7 @@ Execute `30-alert-pilot.md` without changing queue ownership initially.
 Work:
 
 - Extract DTOs, pure policies, repository, and application service.
-- Route admin and characterized direct call sites through service in test/shadow mode.
+- Capture inputs from admin and characterized direct call sites, run the new pure policy in non-mutating shadow mode, and compare results. Legacy code remains the only owner of writes and side effects.
 - Preserve legacy worker entrypoint until reliable event infrastructure exists.
 - Compare old/new decisions against captured alert sequences.
 
@@ -103,6 +130,7 @@ Exit:
 
 - Alert rule tests cover success, no-op, threshold edges, invalid config, ordering, and concurrency decisions.
 - New service has no direct Rabbit/MQTT publication.
+- Shadow execution creates no domain writes, history, outbox work, publication, or settlement effects.
 - Old and new policy results match preserved contracts or intentional differences are approved.
 
 ## 7. P4 — Reliable RabbitMQ Boundary and Alert Cutover
@@ -115,7 +143,7 @@ Work:
 - Add outbox, publisher confirmation, bounded retry, DLQ, and metrics.
 - Create dedicated queues/bindings by responsibility.
 - Add idempotent consumer receipts or projection uniqueness.
-- Make alert transaction persist state, game/audit events, and outbox atomically.
+- Make alert transaction persist state, required audit/domain-event records, and outbox atomically. Session-scoped `GameEvent` integration belongs to P5.
 - Make consumer ACK follow committed success; define reject/retry/poison outcomes.
 - Cut scheduler/admin/MQTT alert paths to one application service.
 - Remove alert model-save and legacy context publication only after parity.
@@ -151,14 +179,21 @@ Exit:
 
 Recommended order:
 
-1. Lock access and player identity/code validation.
-2. Device desired/reported state plus CUP/SUP delivery.
-3. Generic MQTT ingress, keepalive, PING/PONG, and reconciliation.
-4. Terminal account/menu/content and player feed delivery.
-5. Assets/blob lifecycle and URLs.
-6. Passive device configuration.
-7. Scheduler tasks beyond alert auto-change.
-8. Imports, integrity repair, and operational administration.
+1. Lock identity, liveness, reported state, and access behavior.
+2. Asset storage compatibility, blob lifecycle, and media URLs.
+3. Behavior/access, menu/account ordering, and configuration revisions.
+4. Terminal projection, content, player feed, and delivery.
+5. Passive device configuration.
+6. Scheduler tasks beyond alert auto-change.
+7. Imports, integrity repair, and operational administration.
+
+P6 prerequisites and ownership:
+
+- CSV parsing, validation, authorization, audit, and atomic persistence must exist before registering the import route.
+- `admin_extended` owns protected upload UI and parsing; the behavior slice owns user/access persistence and duplicate policy.
+- Asset cutover requires documented storage failure/recovery behavior and a database-to-blob compatibility manifest.
+- Device fanout behavior, target selection, partial failure reporting, and retry ownership must be decided before replacing legacy delivery.
+- Each slice moves its own stateful admin actions behind its application service; P2 provides only the secure admin foundation.
 
 For every slice:
 
@@ -176,7 +211,7 @@ For every slice:
 
 Work:
 
-- Remove dead DRF/API/schema/auth/CORS code and dependencies.
+- Remove only compatibility adapters and legacy routes explicitly deferred by an owning phase after their consumers are gone; do not repeat dependency removal owned by an earlier phase.
 - Remove legacy event contexts/handlers replaced by services.
 - Remove model-save network side effects and compatibility switches.
 - Replace/drop generic stream tables only after archive/migration.
@@ -204,4 +239,3 @@ Pause cutover when any occurs:
 - Data migration cannot preserve identity/order/history semantics.
 - Simulator/golden payload differs from deployed device behavior.
 - Admin workflow loses required operator capability.
-

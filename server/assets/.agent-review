@@ -1,16 +1,34 @@
+---
+kind: current-state-review
+status: verified-current
+reviewed_at: 2026-08-25
+source_revision: c81012250d4b67d668b3537c4bbd14e83d56b954
+source_digest: sha256:6118d3add4f684844ade0e62af6ef4aa5caaaa9281cb16f73c5fb76523b3f4b6
+scope:
+  - server/assets/**
+parent: server/.agent-review
+read_when:
+  - changing asset metadata, blob storage, media URLs, game settings, or user inputs
+target_authority:
+  - .agents/plans/20-migration-roadmap.md
+roadmap_phases: [P2, P6, P7]
+---
 # AGENT REFERENCE: ASSETS
 
-Reviewed: 2026-08-24
-Scope: `server/assets` and direct dependencies
-Purpose: behavior map for preserving asset, game-setting, and user-input contracts during repair or migration
+## Quick Context
+
+- Responsibility: preserve asset metadata/blob relationships, menu payloads, and operator upload behavior.
+- Confirmed contracts: asset UUIDs, content relationships, supported types, and client-visible payload fields require migration evidence.
+- Top defects: destructive basename overwrite, DB/blob non-atomicity, broken write APIs, import-time filesystem work, and uncertain production media serving.
+- Target disposition: retain asset capability behind explicit storage/service boundaries; generic writable REST is transitional.
+- Read next: load behavior review only when terminal/menu payloads also change.
 
 ## 0. Rules
 
-1. Read `server/.agent-review` first, if it is added. No parent review existed at review time.
-2. Treat `server/assets`, current storage paths, API serializers, and direct consumers as authoritative; use generated schema and deployment configuration as supporting evidence.
-3. Preserve confirmed identifiers, media formats, and menu payloads, not public mutation, broken upload behavior, unsafe overwrite semantics, or orphaned files.
-4. Keep HTTP transport, file validation, metadata persistence, blob storage, URL generation, and downstream menu delivery separate.
-5. Make authorization, content validation, size limits, overwrite/delete policy, transaction boundaries, and cache identity explicit.
+1. Treat `server/assets`, current storage paths, API serializers, and direct consumers as authoritative; use generated schema and deployment configuration as supporting evidence.
+2. Preserve confirmed identifiers, media formats, and menu payloads, not public mutation, broken upload behavior, unsafe overwrite semantics, or orphaned files.
+3. Keep HTTP transport, file validation, metadata persistence, blob storage, URL generation, and downstream menu delivery separate.
+4. Make authorization, content validation, size limits, overwrite/delete policy, transaction boundaries, and cache identity explicit.
 
 ## 1. Sources
 
@@ -132,7 +150,7 @@ client GET /media/...
 
 `django.conf.urls.static.static()` serves media only with `DEBUG=True`. Production settings set `DEBUG=False`, Nginx has no `/media` volume/alias, and `/media` is only proxied to Django. Current production topology therefore has no confirmed media-serving path.
 
-## 4. Contracts
+## 4. Observed Contracts
 
 ### Binary asset models
 
@@ -231,7 +249,9 @@ client GET /media/...
 - Defects: import-time filesystem mutation, repeated path segments, destructive basename overwrite, broken binary/text create endpoints, inconsistent URLs, time-based non-content hash, orphan blobs, cascade surprises, ineffective auth mixin, and missing response IDs.
 - Dead/uncertain behavior: no source-code consumer of `HackGame` was found. `TerminalAccount.has_files` references `item.option`, but no such model property was found and the property has no source caller.
 
-## 7. Target Boundaries
+## 7. Candidate Target Mapping
+
+Non-authoritative candidate mapping. `20-migration-roadmap.md` owns phase order; generic writable REST is transitional.
 
 | Target component | Responsibility | Constraints |
 | --- | --- | --- |
@@ -244,7 +264,9 @@ client GET /media/...
 | `GameConfigService` | Validate and serve hack-game settings | Explicit singleton/multi-row ownership and numeric bounds |
 | `UserInputService` | Validate action/expected/delay commands | Preserve unique action and UUID identity; explicit delay units/range |
 
-## 8. Migration Order
+## 8. Roadmap Mapping
+
+`20-migration-roadmap.md` owns order. Map characterization to P0, API/admin decisions to P2, storage migration to P6, and cleanup to P7.
 
 1. Characterize valid admin uploads, existing storage keys/URLs, nested menu payloads, hashes, and every create/update/delete failure.
 2. Lock asset mutations behind explicit permissions and disable broken API write paths until characterized.
@@ -269,16 +291,19 @@ client GET /media/...
 - Hack-game choices/bounds and user-input uniqueness/default/delay policy.
 - Wire/schema compatibility for nested audio/video/image/text/user-input menu payloads.
 
-## 10. Do-Not-Lose
+## 10. Unverified / Decision Required
+
+- Confirm deployed media URL behavior and terminal consumers before preserving any current URL generator.
+- Decide referenced-asset deletion, duplicate-basename, and legacy blob-recovery policies before P6 cutover.
+- Confirm whether `HackGame` has a live consumer.
+- Confirm terminal/client dependency on current asset and menu hash values before defining replacement revision compatibility.
+
+## 11. Confirmed Do-Not-Lose
 
 - Existing UUID primary keys for audio, video, image, text, and user-input records; integer IDs for hack-game rows.
-- Existing menu-item foreign-key relationships and explicit chosen behavior for referenced-asset deletion.
+- Existing menu-item foreign-key relationships until an explicit deletion policy is accepted.
 - Display name, text ident/content, user-input action/expected/delay, and hack-game setting compatibility.
 - Supported extension and size contracts until clients/operators receive a versioned replacement.
 - Leading storage/media compatibility for existing database file names and physical blobs during migration.
 - Menu payload fields consumed by terminal clients: timer, label, nested content name/file, input label, and input description.
-- Stable client-visible asset URL semantics, with legacy URL redirects/read fallback during storage migration.
-- Reliable cache/change identity for menu and terminal configuration; replace current hash deliberately, not silently.
 - Required ability to preview/manage assets in custom admin and deliver them to game clients.
-
-<!-- Observed behavior above is descriptive. Required/target behavior is stated only in Failure Model, Target Boundaries, Migration Order, Minimum Tests, and explicitly qualified Do-Not-Lose items. -->
