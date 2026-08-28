@@ -1,29 +1,63 @@
 site_name: SKABEN Docs
-site_description: Операционная документация SKABEN
+site_description: SKABEN operational documentation
 repo_name: skaben/skaben
 
 docs_dir: docs
 
 theme:
   name: material
+  language: en
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          build: true
+          default: true
+        - locale: ru
+          name: Русский
+          build: true
+          nav_translations:
+            Home: Главная
+            Deployment: Развертывание
+            Description: Описание
+            Operations: Эксплуатация
+            Overview: Оглавление
+            Alert statuses: Статусы тревоги
+            Operator guide: Руководство оператора
+            Devices: Устройства
+            Light array: Массив освещения
+            Powerbox: Щиток
+            Scale: Шкала
+            Lock: Замок
+            Terminal: Терминал
+            Development: Разработка
+            Addressing: Адресация
+            Transport: Транспорт
 
 nav:
-  - Домашняя: index.md
-  - Развертывание: deployment.md
-  - Эксплуатация:
-    - Оглавление: operating/index.md
-    - Адресация: operating/addressing.md
-    - Устройства: operating/client_devices.md
-    - Щиток: operating/powerbox.md
-    - Замок: operating/lock.md
-    - Массив освещения: operating/light_array.md
-    - Шкала: operating/scale.md
-    - Статусы тревоги: operating/alert_status.md
-    - Терминал: operating/terminal.md
-    - Руководство оператора: operating/operator_guide.md
-  - Разработка:
-    - Оглавление: development/index.md
-    - Адресация: development/addressing.md
-    - Транспорт: development/transport.md
+  - Home: index.md
+  - Deployment: deployment.md
+  - Description: description.md
+  - Operations:
+    - Overview: operating/index.md
+    - Alert statuses: operating/alert_status.md
+    - Operator guide: operating/operator_guide.md
+    - Devices: operating/client_devices.md
+    - Light array: operating/light_array.md
+    - Powerbox: operating/powerbox.md
+    - Scale: operating/scale.md
+    - Lock: operating/lock.md
+    - Terminal: operating/terminal.md
+  - Development:
+    - Overview: development/index.md
+    - Addressing: development/addressing.md
+    - Transport: development/transport.md
 
 use_directory_urls: true
